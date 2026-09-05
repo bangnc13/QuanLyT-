@@ -54,12 +54,12 @@ except Exception as e:
     st.error(f"[SYSTEM ERROR]: Không thể nạp dữ liệu. Chi tiết: {e}")
     st.stop()
 
-# 3. Thuật toán OSRM tính tuyến đường xe máy thực tế
+# 3. Thuật toán OSRM tính đường bộ thực tế cho xe máy
 def get_osrm_route(coords_list):
     loc_str = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
     url = f"http://router.project-osrm.org/route/v1/driving/{loc_str}?overview=full&geometries=geojson"
     try:
-        res = requests.get(url, timeout=3)
+        res = requests.get(url, timeout=4)
         data = res.json()
         if data.get("code") == "Ok":
             route_geometry = data["routes"][0]["geometry"]["coordinates"]
@@ -68,7 +68,7 @@ def get_osrm_route(coords_list):
         pass
     return coords_list
 
-# 4. Thuật toán TSP sắp xếp lộ trình
+# 4. Thuật toán TSP tìm chuỗi điểm tối ưu từ điểm xuất phát (index 0)
 def haversine_matrix(coords):
     rads = np.radians(coords)
     lats, lons = rads[:, 0], rads[:, 1]
@@ -77,15 +77,14 @@ def haversine_matrix(coords):
     a = np.sin(dlat / 2.0)**2 + np.cos(lats[:, None]) * np.cos(lats[None, :]) * np.sin(dlon / 2.0)**2
     return 6371 * 2 * np.arcsin(np.sqrt(a))
 
-def solve_tsp(selected_df):
+def solve_tsp_from_start(selected_df):
     coords = selected_df[['Latitude', 'Longitude']].values
     dist_mat = haversine_matrix(coords)
     num_pts = len(coords)
     
-    unvisited = set(range(num_pts))
+    unvisited = set(range(1, num_pts))
     current = 0
     path = [current]
-    unvisited.remove(current)
     
     while unvisited:
         next_pt = min(unvisited, key=lambda x: dist_mat[current][x])
@@ -95,18 +94,31 @@ def solve_tsp(selected_df):
         
     return path
 
-# Khởi tạo State
+# 5. Khởi tạo & Lưu trữ trạng thái không bị mất khi bấm tương tác
+if 'user_lat' not in st.session_state:
+    st.session_state['user_lat'] = None
+if 'user_lon' not in st.session_state:
+    st.session_state['user_lon'] = None
 if 'is_routed' not in st.session_state:
     st.session_state['is_routed'] = False
 
-# 5. Thanh Menu Sidebar
+# Đọc GPS đẩy từ Javascript URL
+query_params = st.query_params
+if "lat" in query_params and "lon" in query_params:
+    try:
+        st.session_state['user_lat'] = float(query_params["lat"])
+        st.session_state['user_lon'] = float(query_params["lon"])
+    except:
+        pass
+
+# 6. Thanh Menu Sidebar
 with st.sidebar:
     st.markdown("<h3 style='color: #27ae60; font-size: 18px; margin-bottom: 2px;'>⚡ TQG - Tuyến đường</h3>", unsafe_allow_html=True)
     st.markdown("<p style='color: #2ab7ca; font-size: 11px; margin-bottom: 15px;'>Make by BangNC13</p>", unsafe_allow_html=True)
     
-    # Nút bấm tích hợp JS Kích hoạt Định vị tức thì trên Bản đồ
+    # Nút bấm lấy GPS điện thoại
     st.components.v1.html("""
-        <button onclick="window.parent.triggerMapGPS()" style="
+        <button id="gps_btn" style="
             width: 100%;
             background-color: #ff4d4f;
             color: white;
@@ -118,11 +130,35 @@ with st.sidebar:
             cursor: pointer;
             box-shadow: 0 2px 4px rgba(0,0,0,0.15);
         ">📍 Tôi đang đứng</button>
+
+        <script>
+            document.getElementById('gps_btn').onclick = function() {
+                var btn = this;
+                btn.innerHTML = "⚡ Đang lấy vị trí...";
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(function(position) {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        const url = new URL(window.parent.location.href);
+                        url.searchParams.set('lat', lat);
+                        url.searchParams.set('lon', lon);
+                        window.parent.location.href = url.href;
+                    }, function(error) {
+                        alert("Không lấy được GPS. Vui lòng bật vị trí thiết bị.");
+                        btn.innerHTML = "📍 Tôi đang đứng";
+                    }, { enableHighAccuracy: true, timeout: 5000 });
+                } else {
+                    alert("Trình duyệt không hỗ trợ Geolocation.");
+                }
+            };
+        </script>
     """, height=50)
+
+    if st.session_state['user_lat'] is not None:
+        st.caption("✅ Đã nhận vị trí hiện tại")
 
     st.markdown("<hr style='margin: 10px 0; border: none; border-top: 1px solid #dcdfe6;'>", unsafe_allow_html=True)
 
-    # Lọc dữ liệu POP
     all_objects = df['Tên đối tượng'].tolist()
     st.markdown("**LỌC DỮ LIỆU POP**")
     selected_names = st.multiselect(
@@ -132,7 +168,7 @@ with st.sidebar:
         label_visibility="collapsed"
     )
 
-    # Đổi màu nút "Bấm" sang xanh dương khi kích hoạt
+    # Đổi style nút "Bấm" duy trì màu xanh dương khi lộ trình đang kích hoạt
     if st.session_state['is_routed']:
         st.markdown("""
             <style>
@@ -146,69 +182,49 @@ with st.sidebar:
     
     btn_type = "primary" if st.session_state['is_routed'] else "secondary"
     if st.button("Bấm", type=btn_type):
-        st.session_state['is_routed'] = not st.session_state['is_routed']
-        st.rerun()
+        if st.session_state['user_lat'] is None:
+            st.error("Vui lòng nhấn '📍 Tôi đang đứng' để định vị trước!")
+        else:
+            # Khóa trạng thái lộ trình, nhấn lại không bị mất
+            st.session_state['is_routed'] = True
+            st.rerun()
 
-# 6. Render Bản đồ & Định vị trực tiếp
+# 7. Render Bản đồ & Duy trì Tuyến đường
 selected_df = df[df['Tên đối tượng'].isin(selected_names)].reset_index(drop=True)
 
-center_lat = selected_df['Latitude'].iloc[0] if len(selected_df) > 0 else 21.823
-center_lon = selected_df['Longitude'].iloc[0] if len(selected_df) > 0 else 105.216
+# Tích hợp vị trí hiện tại làm điểm xuất phát (Index 0)
+if st.session_state['user_lat'] is not None:
+    my_loc_row = pd.DataFrame([{
+        'Tên đối tượng': '📍 Vị trí hiện tại của tôi',
+        'Latitude': st.session_state['user_lat'],
+        'Longitude': st.session_state['user_lon']
+    }])
+    full_df = pd.concat([my_loc_row, selected_df], ignore_index=True)
+else:
+    full_df = selected_df.copy()
+
+center_lat = full_df['Latitude'].iloc[0] if len(full_df) > 0 else 21.823
+center_lon = full_df['Longitude'].iloc[0] if len(full_df) > 0 else 105.216
 
 m = folium.Map(
     location=[center_lat, center_lon], 
-    zoom_start=13,
+    zoom_start=14,
     zoom_control=False,
     tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
     attr="Google Maps Standard"
 )
 
-# Thêm nút Zoom góc dưới phải
 m.get_root().html.add_child(folium.Element('<script>L.control.zoom({ position: "bottomright" }).addTo(map);</script>'))
 
-# Hàm JavaScript giúp kết nối Nút bấm Menu với Bản đồ để hiển thị Vị trí điện thoại
-map_gps_script = '''
-<script>
-    var currentGpsMarker = null;
-    
-    window.triggerMapGPS = function() {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(function(position) {
-                var lat = position.coords.latitude;
-                var lon = position.coords.longitude;
-                
-                if (currentGpsMarker) {
-                    map.removeLayer(currentGpsMarker);
-                }
-                
-                var myIcon = L.divIcon({
-                    className: 'custom-gps',
-                    html: "<div style='background-color:#e74c3c; color:white; border:2px solid white; border-radius:50%; width:30px; height:30px; text-align:center; line-height:26px; font-size:15px; font-weight:bold; box-shadow:0 2px 6px rgba(0,0,0,0.4);'>🛵</div>",
-                    iconSize: [30, 30],
-                    iconAnchor: [15, 15]
-                });
-
-                currentGpsMarker = L.marker([lat, lon], {icon: myIcon}).addTo(map)
-                    .bindPopup("<b>Vị trí hiện tại của bạn</b>").openPopup();
-                
-                map.setView([lat, lon], 15);
-            }, function(error) {
-                alert("Vui lòng cho phép quyền định vị GPS trên điện thoại.");
-            }, { enableHighAccuracy: true });
-        }
-    };
-</script>
-'''
-m.get_root().html.add_child(folium.Element(map_gps_script))
-
-# Khi bấm nút "Bấm" -> Vẽ tuyến đường di chuyển tối ưu
-if st.session_state['is_routed'] and len(selected_df) > 1:
-    path_indices = solve_tsp(selected_df)
-    ordered_df = selected_df.iloc[path_indices].reset_index(drop=True)
+# Trường hợp đã kích hoạt nút "Bấm" -> Giữ nguyên tuyến đường xe máy xuất phát từ vị trí đang đứng
+if st.session_state['is_routed'] and st.session_state['user_lat'] is not None and len(full_df) > 1:
+    path_indices = solve_tsp_from_start(full_df)
+    ordered_df = full_df.iloc[path_indices].reset_index(drop=True)
 
     raw_coords = ordered_df[['Latitude', 'Longitude']].values.tolist()
     osrm_route = get_osrm_route(raw_coords)
 
+    # Vẽ tuyến đường PolyLine màu xanh dương
     folium.PolyLine(
         osrm_route, 
         color="#007bff", 
@@ -216,13 +232,17 @@ if st.session_state['is_routed'] and len(selected_df) > 1:
         opacity=0.85
     ).add_to(m)
 
+    # Hiển thị thứ tự di chuyển 1, 2, 3...
     for idx, row in ordered_df.iterrows():
         seq_num = idx + 1
+        is_my_loc = (row['Tên đối tượng'] == '📍 Vị trí hiện tại của tôi')
+        bg_color = "#e74c3c" if is_my_loc else "#007bff"
+        
         marker_html = f'''
-            <div style="font-family:sans-serif; font-size:10pt; color:white; background-color:#007bff; 
+            <div style="font-family:sans-serif; font-size:10pt; color:white; background-color:{bg_color}; 
                         border:2px solid white; border-radius:50%; width:26px; height:26px; 
                         text-align:center; line-height:22px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.3);">
-                {seq_num}
+                {seq_num if not is_my_loc else "🛵"}
             </div>
         '''
         folium.Marker(
@@ -231,14 +251,18 @@ if st.session_state['is_routed'] and len(selected_df) > 1:
             icon=folium.DivIcon(html=marker_html)
         ).add_to(m)
 
-# Chưa bấm "Bấm" -> Hiển thị vị trí mốc thường
+# Chưa bấm nút "Bấm" -> Chỉ hiển thị vị trí đứng và các POP
 else:
-    for idx, row in selected_df.iterrows():
-        marker_html = '''
-            <div style="font-family:sans-serif; font-size:10pt; color:white; background-color:#27ae60; 
+    for idx, row in full_df.iterrows():
+        is_my_loc = (row['Tên đối tượng'] == '📍 Vị trí hiện tại của tôi')
+        bg_color = "#e74c3c" if is_my_loc else "#27ae60"
+        icon_str = "🛵" if is_my_loc else "📍"
+        
+        marker_html = f'''
+            <div style="font-family:sans-serif; font-size:10pt; color:white; background-color:{bg_color}; 
                         border:2px solid white; border-radius:50%; width:26px; height:26px; 
                         text-align:center; line-height:22px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.3);">
-                📍
+                {icon_str}
             </div>
         '''
         folium.Marker(
