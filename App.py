@@ -6,30 +6,42 @@ from streamlit_folium import st_folium
 from folium.plugins import LocateControl
 import urllib.parse
 
-# 1. Cấu hình trang full view & Dark Theme Robotic
-st.set_page_config(layout="wide", page_title="Robotic Route HUD", initial_sidebar_state="expanded")
+# 1. Cấu hình trang full view & Theme Sáng Clean (như ảnh)
+st.set_page_config(layout="wide", page_title="TQG-XÁC ĐỊNH VỊ TRÍ", initial_sidebar_state="expanded")
 
 st.markdown("""
     <style>
-        /* Dark Theme Style */
+        /* Light Clean Theme */
         .stApp {
-            background-color: #0d1117;
-            color: #58a6ff;
-            font-family: 'Courier New', Courier, monospace;
+            background-color: #f8f9fa;
+            color: #212529;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
         .block-container {
             padding: 0.5rem 0.5rem 0rem 0.5rem !important;
         }
         header {visibility: hidden;}
         
-        /* Tùy chỉnh Sidebar phong cách Robotic */
+        /* Tùy chỉnh Sidebar màu xám sáng chuẩn mẫu */
         section[data-testid="stSidebar"] {
-            background-color: #161b22;
-            border-right: 1px solid #30363d;
+            background-color: #f0f2f5;
+            border-right: 1px solid #e0e0e0;
+            padding: 1rem 0.5rem;
         }
-        section[data-testid="stSidebar"] * {
-            color: #c9d1d9 !important;
-            font-family: 'Courier New', Courier, monospace;
+        section[data-testid="stSidebar"] label {
+            color: #495057 !important;
+            font-size: 12px !important;
+            font-weight: 600 !important;
+            text-transform: uppercase;
+        }
+        
+        /* Stylize nút bấm Streamlit trong Sidebar */
+        div.stButton > button {
+            width: 100%;
+            border-radius: 4px;
+            font-weight: bold;
+            border: none;
+            padding: 8px 16px;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -76,32 +88,55 @@ def solve_tsp(selected_df):
         
     return path, total_dist
 
-# 4. Thanh Menu điều khiển chọn điểm
-st.sidebar.title("⚙️ CONTROL PANEL")
-all_objects = df['Tên đối tượng'].tolist()
+# 4. Sidebar giao diện chuẩn mẫu
+with st.sidebar:
+    st.markdown("<h3 style='color: #1e7e34; font-size: 18px; margin-bottom: 2px;'>⚡ TQG-XÁC ĐỊNH VỊ TRÍ DỨT CÁP</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #28a745; font-size: 12px; margin-bottom: 15px;'>Make by BangNC13</p>", unsafe_allow_html=True)
+    
+    st.caption("LỌC DỮ LIỆU POP")
+    all_objects = df['Tên đối tượng'].tolist()
+    
+    selected_names = st.multiselect(
+        "CHỌN DANH SÁCH ĐIỂM SẮP XẾP:",
+        options=all_objects,
+        default=all_objects[:10] if len(all_objects) >= 10 else all_objects[:2],
+        label_visibility="collapsed"
+    )
+    
+    st.markdown("<h4 style='color: #333; font-size: 14px; margin-top: 20px;'>📍 THÔNG TIN ĐO (OTDR)</h4>", unsafe_allow_html=True)
+    
+    st.caption("Điểm đo (Đang đứng)")
+    start_node_name = st.selectbox("Start Node", options=selected_names if selected_names else all_objects, label_visibility="collapsed")
+    
+    st.caption("Hướng đo (Xuôi ngon / Về ODF)")
+    end_node_name = st.selectbox("End Node", options=selected_names if selected_names else all_objects, index=min(1, len(selected_names)-1), label_visibility="collapsed")
+    
+    st.caption("Chiều dài đo được (Mét)")
+    measure_dist = st.number_input("Dist", value=170.00, step=10.0, format="%.2f", label_visibility="collapsed")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown('''
+            <button style="width:100%; background-color:#ff4d4f; color:white; border:none; padding:8px; border-radius:4px; font-weight:bold; cursor:pointer;">
+                📌 Xác định
+            </button>
+        ''', unsafe_allow_html=True)
+    with col2:
+        st.markdown('''
+            <button style="width:100%; background-color:#e0e0e0; color:#333; border:none; padding:8px; border-radius:4px; font-weight:bold; cursor:pointer;">
+                🗑️ Xóa
+            </button>
+        ''', unsafe_allow_html=True)
 
-selected_names = st.sidebar.multiselect(
-    "SELECT NODES (Tối thiểu 2 điểm):",
-    options=all_objects,
-    default=all_objects[:10] if len(all_objects) >= 10 else all_objects[:2]
-)
-
+# 5. Xử lý logic dữ liệu bản đồ
 if len(selected_names) < 2:
-    st.warning("[WARNING]: Vui lòng chọn ít nhất 2 đối tượng trên Menu bên cạnh.")
+    st.warning("Vui lòng chọn ít nhất 2 đối tượng ở danh sách bên cạnh.")
 else:
     selected_df = df[df['Tên đối tượng'].isin(selected_names)].reset_index(drop=True)
     path_indices, total_km = solve_tsp(selected_df)
     ordered_df = selected_df.iloc[path_indices].reset_index(drop=True)
 
-    # 5. Tạo URL Google Maps cho toàn bộ lộ trình
-    origin = f"{ordered_df.iloc[0]['Latitude']},{ordered_df.iloc[0]['Longitude']}"
-    destination = f"{ordered_df.iloc[-1]['Latitude']},{ordered_df.iloc[-1]['Longitude']}"
-    waypoints = "|".join([f"{row['Latitude']},{row['Longitude']}" for _, row in ordered_df.iloc[1:-1].iterrows()])
-    gmaps_full_route_url = f"https://www.google.com/maps/dir/?api=1&origin={origin}&destination={destination}"
-    if waypoints:
-        gmaps_full_route_url += f"&waypoints={urllib.parse.quote(waypoints)}"
-
-    # 6. Khởi tạo Bản đồ Google Maps (Zoom control ở bottomright)
+    # 6. Khởi tạo Bản đồ Google Maps Standard Sáng
     center_lat = ordered_df['Latitude'].mean()
     center_lon = ordered_df['Longitude'].mean()
 
@@ -109,8 +144,8 @@ else:
         location=[center_lat, center_lon], 
         zoom_start=13,
         zoom_control=False,
-        tiles="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
-        attr="Google Maps Hybrid"
+        tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+        attr="Google Maps Standard"
     )
 
     # Đưa nút Zoom (+ -) xuống góc dưới bên phải
@@ -120,244 +155,110 @@ else:
         </script>
     '''))
 
-    # Nút Định vị GPS Cyberpunk
-    LocateControl(
-        auto_start=False,
-        flyTo=True,
-        keepCurrentZoomLevel=True,
-        strings={"title": "TARGET GPS LOCK"},
-        icon="fa-crosshairs",
-        icon_element='<span class="fa fa-crosshairs" style="color: #00ffcc; font-size: 18px;"></span>'
-    ).add_to(m)
+    # Nút bấm góc trên trái giống ảnh mẫu (GPS của tôi / Chỉ đường)
+    first_target_lat = ordered_df.iloc[0]['Latitude']
+    first_target_lon = ordered_df.iloc[0]['Longitude']
+    direct_gmaps_url = f"https://www.google.com/maps/dir/?api=1&destination={first_target_lat},{first_target_lon}"
 
-    # 7. Bảng điều khiển HUD thông số lộ trình
-    hud_html = f'''
+    top_buttons_html = f'''
     <div style="
         position: fixed; 
         top: 15px; 
-        left: 60px; 
-        z-index: 9999; 
-        background: rgba(13, 17, 23, 0.9);
-        border: 1px solid #30363d;
-        border-left: 4px solid #00ffcc;
-        box-shadow: 0 0 15px rgba(0, 255, 204, 0.2);
-        border-radius: 4px;
-        padding: 10px 15px;
-        color: #e6edf3;
-        font-family: monospace;
-    ">
-        <div style="font-size: 11px; color: #8b949e; letter-spacing: 1px;">SYS.ROUTE_NAV // ACTIVE</div>
-        <div style="font-size: 18px; font-weight: bold; color: #00ffcc; margin: 2px 0 8px 0;">
-            DIST: {total_km:.2f} KM <span style="font-size:12px; color:#8b949e;">({len(ordered_df)} NODES)</span>
-        </div>
-        <a href="{gmaps_full_route_url}" target="_blank" style="
-            display: inline-block;
-            background: linear-gradient(90deg, #1f6beb, #238636);
-            color: #ffffff;
-            padding: 6px 12px;
-            text-decoration: none;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: bold;
-            letter-spacing: 1px;
-            box-shadow: 0 0 8px rgba(35, 134, 54, 0.4);
-        ">
-            ⚡ OPEN FULL ROUTE (GMAPS)
-        </a>
-    </div>
-    '''
-    m.get_root().html.add_child(folium.Element(hud_html))
-
-    # 8. Công cụ Chỉ đường Thông minh từ Vị trí GPS hiện tại hoặc Chọn điểm
-    node_options_js = "".join([f'<option value="{row["Latitude"]},{row["Longitude"]}">#{idx+1}. {row["Tên đối tượng"]}</option>' for idx, row in ordered_df.iterrows()])
-    
-    routing_hud_html = f'''
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
-    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
-    
-    <div style="
-        position: fixed; 
-        bottom: 20px; 
         left: 20px; 
         z-index: 9999; 
-        background: rgba(13, 17, 23, 0.95);
-        border: 1px solid #30363d;
-        border-top: 3px solid #1f6beb;
-        box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
-        border-radius: 6px;
-        padding: 12px;
-        color: #e6edf3;
-        font-family: monospace;
-        width: 300px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     ">
-        <div style="font-size: 12px; font-weight: bold; color: #58a6ff; margin-bottom: 8px;">🧭 ON-MAP SMART ROUTING</div>
-        
-        <div style="margin-bottom: 6px;">
-            <label style="font-size: 10px; color: #8b949e;">START NODE:</label><br>
-            <select id="start_node" style="width: 100%; background: #161b22; color: #00ffcc; border: 1px solid #30363d; padding: 4px; border-radius: 3px; font-family: monospace;">
-                <option value="GPS">📍 MY CURRENT LOCATION (GPS)</option>
-                {node_options_js}
-            </select>
-        </div>
-        
-        <div style="margin-bottom: 10px;">
-            <label style="font-size: 10px; color: #8b949e;">TARGET DESTINATION:</label><br>
-            <select id="end_node" style="width: 100%; background: #161b22; color: #ff7b72; border: 1px solid #30363d; padding: 4px; border-radius: 3px; font-family: monospace;">
-                {node_options_js}
-            </select>
-        </div>
-        
-        <button onclick="executeRouting()" style="
-            width: 100%;
-            background: #238636;
-            color: white;
-            border: none;
-            padding: 7px;
-            border-radius: 3px;
+        <button onclick="locateUser()" style="
+            background: #ffffff;
+            color: #333333;
+            border: 1px solid #cccccc;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 13px;
             font-weight: bold;
-            font-family: monospace;
             cursor: pointer;
-            box-shadow: 0 0 8px rgba(35, 134, 54, 0.4);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 6px;
         ">
-            ▶ NAVIGATE ON MAP
+            <span style="color: #ff4d4f;">🎯</span> GPS của tôi
         </button>
+        
+        <a href="{direct_gmaps_url}" target="_blank" style="
+            background: #00b894;
+            color: #ffffff;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: bold;
+            text-decoration: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        ">
+            🛣️ Chỉ đường tới điểm sự cố
+        </a>
     </div>
 
     <script>
-        var routingControl = null;
-
-        function drawPath(startLat, startLon, endLat, endLon) {{
-            if (routingControl !== null) {{
-                map.removeControl(routingControl);
-            }}
-
-            routingControl = L.Routing.control({{
-                waypoints: [
-                    L.latLng(startLat, startLon),
-                    L.latLng(endLat, endLon)
-                ],
-                routeWhileDragging: false,
-                lineOptions: {{
-                    styles: [{{color: '#ff7b72', opacity: 0.9, weight: 6}}]
-                }},
-                show: false,
-                addWaypoints: false
-            }}).addTo(map);
-        }}
-
-        function executeRouting() {{
-            var startVal = document.getElementById('start_node').value;
-            var endVal = document.getElementById('end_node').value.split(',');
-            
-            var endLat = parseFloat(endVal[0]);
-            var endLon = parseFloat(endVal[1]);
-
-            if (startVal === "GPS") {{
-                if (navigator.geolocation) {{
-                    navigator.geolocation.getCurrentPosition(function(position) {{
-                        var userLat = position.coords.latitude;
-                        var userLon = position.coords.longitude;
-                        
-                        // Vẽ marker vị trí của người dùng
-                        L.circleMarker([userLat, userLon], {{
-                            radius: 8,
-                            fillColor: "#00ffcc",
-                            color: "#ffffff",
-                            weight: 2,
-                            opacity: 1,
-                            fillOpacity: 0.9
-                        }}).addTo(map).bindPopup("📍 YOUR LOCATION").openPopup();
-
-                        drawPath(userLat, userLon, endLat, endLon);
-                    }}, function(error) {{
-                        alert("[GPS ERROR]: Không thể lấy vị trí thiết bị. Vui lòng bật vị trí GPS trên trình duyệt/điện thoại.");
-                    }});
-                }} else {{
-                    alert("[ERROR]: Trình duyệt không hỗ trợ Geolocation.");
-                }}
-            }} else {{
-                var startCoords = startVal.split(',');
-                var startLat = parseFloat(startCoords[0]);
-                var startLon = parseFloat(startCoords[1]);
-                drawPath(startLat, startLon, endLat, endLon);
+        function locateUser() {{
+            if (navigator.geolocation) {{
+                navigator.geolocation.getCurrentPosition(function(position) {{
+                    var userLat = position.coords.latitude;
+                    var userLon = position.coords.longitude;
+                    map.setView([userLat, userLon], 15);
+                    L.marker([userLat, userLon]).addTo(map).bindPopup("📍 Vị trí hiện tại của bạn").openPopup();
+                }}, function() {{
+                    alert("Không thể truy cập GPS vị trí của bạn.");
+                }});
             }}
         }}
     </script>
     '''
-    m.get_root().html.add_child(folium.Element(routing_hud_html))
+    m.get_root().html.add_child(folium.Element(top_buttons_html))
 
-    # 9. Đường nối tổng thể
+    # 7. Vẽเส้น đường liên kết các điểm mốc
     route_coords = ordered_df[['Latitude', 'Longitude']].values.tolist()
     folium.PolyLine(
         route_coords, 
-        color="#00ffcc", 
-        weight=4, 
-        opacity=0.7, 
-        dash_array='6, 6'
+        color="#4a69bd", 
+        weight=5, 
+        opacity=0.8
     ).add_to(m)
 
-    # 10. Marker các điểm mốc
+    # 8. Marker các điểm mốc tròn màu xanh biển chuẩn
     for idx, row in ordered_df.iterrows():
         seq_num = idx + 1
-        direct_gmaps_url = f"https://www.google.com/maps/dir/?api=1&destination={row['Latitude']},{row['Longitude']}"
-        
-        popup_html = f"""
-        <div style="
-            font-family: monospace; 
-            background-color: #0d1117; 
-            color: #c9d1d9; 
-            padding: 10px; 
-            border-radius: 4px;
-            border: 1px solid #30363d;
-            min-width: 180px;
-        ">
-            <div style="font-size: 10px; color: #8b949e;">NODE #{seq_num:02d}</div>
-            <div style="font-size: 14px; font-weight: bold; color: #58a6ff; margin-bottom: 5px;">
-                {row['Tên đối tượng']}
-            </div>
-            <div style="font-size: 11px; color: #8b949e; margin-bottom: 10px;">
-                LAT: {row['Latitude']:.5f}<br>LON: {row['Longitude']:.5f}
-            </div>
-            <a href="{direct_gmaps_url}" target="_blank" style="
-                display: block;
-                text-align: center;
-                background-color: #238636;
-                color: #ffffff;
-                padding: 6px 8px;
-                text-decoration: none;
-                border-radius: 3px;
-                font-size: 11px;
-                font-weight: bold;
-            ">
-                🧭 NAVIGATE VIA GMAPS
-            </a>
-        </div>
-        """
         
         marker_icon_html = f'''
             <div style="
-                font-family: monospace;
-                font-size: 11pt; 
-                color: #0d1117; 
-                background-color: #00ffcc; 
+                font-family: sans-serif;
+                font-size: 10pt; 
+                color: #ffffff; 
+                background-color: #1e90ff; 
                 border: 2px solid #ffffff;
-                border-radius: 3px; 
-                width: 26px; 
-                height: 26px; 
+                border-radius: 50%; 
+                width: 24px; 
+                height: 24px; 
                 text-align: center; 
-                line-height: 22px; 
+                line-height: 20px; 
                 font-weight: bold;
-                box-shadow: 0 0 10px rgba(0, 255, 204, 0.8);">
+                box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
                 {seq_num}
             </div>
         '''
         
         folium.Marker(
             location=[row['Latitude'], row['Longitude']],
-            popup=folium.Popup(popup_html, max_width=300),
-            tooltip=f"NODE #{seq_num:02d}: {row['Tên đối tượng']}",
+            tooltip=f"{seq_num}. {row['Tên đối tượng']}",
             icon=folium.DivIcon(html=marker_icon_html)
         ).add_to(m)
 
-    # Hiển thị bản đồ
+    # Hiển thị bản đồ tràn khung
     st_folium(m, width="100%", height=850, returned_objects=[])
