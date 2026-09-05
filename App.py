@@ -23,65 +23,40 @@ st.markdown("""
     .stApp { background-color: #1a0a00 !important; }
     html, body, .stMarkdown, p, label { color: #ffffff !important; }
 
-    /* ========================================================= */
-    /* STYLING NÚT MENU TOGGLE (CỐ ĐỊNH MÀU KHI BẬT / TẮT MENU)  */
-    /* ========================================================= */
+    /* Custom nút ẩn/hiện menu sidebar màu Xanh Neon & Bo tròn */
     [data-testid="stSidebarCollapseButton"],
-    [data-testid="stSidebarExpandButton"],
-    [data-testid="stSidebarCollapsedControl"],
-    button[data-testid="baseButton-headerNoPadding"],
-    div[data-testid="stSidebarCollapsedControl"] button {
+    [data-testid="stSidebarExpandButton"] button,
+    button[data-testid="baseButton-headerNoPadding"] {
         background-color: #1a0a00 !important;
         border: 2px solid #00f0ff !important;
         border-radius: 50% !important;
         color: #00f0ff !important;
-        box-shadow: 0 0 12px rgba(0, 240, 255, 0.7) !important;
+        box-shadow: 0 0 10px rgba(0, 240, 255, 0.6) !important;
         transition: all 0.3s ease-in-out !important;
-        width: 42px !important;
-        height: 42px !important;
+        width: 40px !important;
+        height: 40px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        padding: 0 !important;
-        margin: 5px !important;
     }
 
-    /* Hiệu ứng Hover nút Menu */
     [data-testid="stSidebarCollapseButton"]:hover,
-    [data-testid="stSidebarExpandButton"]:hover,
-    [data-testid="stSidebarCollapsedControl"]:hover,
-    button[data-testid="baseButton-headerNoPadding"]:hover,
-    div[data-testid="stSidebarCollapsedControl"] button:hover {
+    [data-testid="stSidebarExpandButton"] button:hover,
+    button[data-testid="baseButton-headerNoPadding"]:hover {
         background-color: #00f0ff !important;
-        box-shadow: 0 0 22px rgba(0, 240, 255, 1) !important;
-        transform: scale(1.08) !important;
+        color: #000000 !important;
+        box-shadow: 0 0 20px rgba(0, 240, 255, 1) !important;
+        transform: scale(1.1) !important;
     }
 
-    /* Ép màu Icon SVG bên trong luôn màu Xanh Neon */
+    /* Đổi màu icon bên trong nút menu sang Xanh Neon */
     [data-testid="stSidebarCollapseButton"] svg,
     [data-testid="stSidebarExpandButton"] svg,
-    [data-testid="stSidebarCollapsedControl"] svg,
-    button[data-testid="baseButton-headerNoPadding"] svg,
-    div[data-testid="stSidebarCollapsedControl"] button svg {
+    button[data-testid="baseButton-headerNoPadding"] svg {
         fill: #00f0ff !important;
         color: #00f0ff !important;
-        stroke: #00f0ff !important;
-        transition: all 0.3s ease-in-out !important;
     }
 
-    [data-testid="stSidebarCollapseButton"]:hover svg,
-    [data-testid="stSidebarExpandButton"]:hover svg,
-    [data-testid="stSidebarCollapsedControl"]:hover svg,
-    button[data-testid="baseButton-headerNoPadding"]:hover svg,
-    div[data-testid="stSidebarCollapsedControl"] button:hover svg {
-        fill: #000000 !important;
-        color: #000000 !important;
-        stroke: #000000 !important;
-    }
-
-    /* ========================================================= */
-    /* CÁC GIAO DIỆN KHÁC                                        */
-    /* ========================================================= */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #331400 0%, #1f0c00 100%) !important;
         border-right: 2px solid #ff6600 !important;
@@ -374,7 +349,7 @@ if st.session_state.route_coords:
 
 folium.LayerControl().add_to(m)
 
-# INJECT JAVASCRIPT & CSS MARKER VÀ NÚT TỌA ĐỘ GPS Ở GÓC DƯỚI BẢN ĐỒ
+# INJECT JAVASCRIPT & CSS REALTIME MARKER VÀ NÚT TỌA ĐỘ GPS
 js_realtime_tracker = """
 <script>
     setTimeout(function() {
@@ -382,7 +357,7 @@ js_realtime_tracker = """
         if (!map_element) return;
         var map = map_element._leaflet_map;
         
-        // 1. Marker Vị trí chuẩn Google Maps
+        // 1. Tạo Icon Marker chuẩn Google Maps Blue Dot
         var googleDotIcon = L.divIcon({
             className: 'gmaps-marker',
             html: '<div class="gmaps-pulse"></div><div class="gmaps-dot"></div>',
@@ -393,6 +368,7 @@ js_realtime_tracker = """
         var userMarker = null;
         var currentLatLng = null;
 
+        // 2. Hàm định vị vị trí người dùng
         function updateLocation(centerMap) {
             if ("geolocation" in navigator) {
                 navigator.geolocation.getCurrentPosition(function(position) {
@@ -416,8 +392,10 @@ js_realtime_tracker = """
             }
         }
 
+        // Tự động lấy vị trí ban đầu
         updateLocation(false);
 
+        // Theo dõi di chuyển liên tục
         if ("geolocation" in navigator) {
             navigator.geolocation.watchPosition(function(position) {
                 var lat = position.coords.latitude;
@@ -433,12 +411,13 @@ js_realtime_tracker = """
             }, null, { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 });
         }
 
-        // 2. TẠO NÚT BẤM GPS ĐẶT Ở GÓC DƯỚI BÊN PHẢI (bottomright)
-        var gpsControl = L.control({position: 'bottomright'});
+        # 3. Tạo nút bấm biểu tượng Tọa độ (GPS Control)
+        var gpsControl = L.control({position: 'topright'});
         gpsControl.onAdd = function (map) {
             var div = L.DomUtil.create('div', 'leaflet-bar leaflet-control custom-gps-btn');
-            div.innerHTML = '<button title="Định vị vị trí hiện tại" style="background-color: #1a0a00; border: 2px solid #00f0ff; border-radius: 50%; width: 44px; height: 44px; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 0 15px rgba(0,240,255,0.6); transition: all 0.3s ease; margin-bottom: 25px; margin-right: 10px;">' +
+            div.innerHTML = '<button title="Định vị vị trí hiện tại" style="background-color: #1a0a00; border: 2px solid #00f0ff; border-radius: 50%; width: 44px; height: 44px; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 0 15px rgba(0,240,255,0.6); transition: all 0.3s ease;">' +
                             '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00f0ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+                            '<crosshair x1="12" y1="2" x2="12" y2="6"></crosshair>' +
                             '<circle cx="12" cy="12" r="7"></circle>' +
                             '<line x1="12" y1="2" x2="12" y2="5"></line>' +
                             '<line x1="12" y1="19" x2="12" y2="22"></line>' +
@@ -518,5 +497,5 @@ js_realtime_tracker = """
 # Render Map
 map_data = st_folium(m, width="100%", height=850)
 
-# Inject HTML/JS Component
+# Inject đoạn mã HTML/JS
 st.components.v1.html(js_realtime_tracker, height=0)
