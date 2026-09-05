@@ -18,29 +18,42 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
 
+    /* Tối ưu không gian tràn màn hình */
+    html, body, [data-testid="stAppViewContainer"] {
+        height: 100vh !important;
+        overflow: hidden !important;
+    }
+
     .block-container {
         padding: 0rem !important;
         max-width: 100% !important;
+        height: 100vh !important;
     }
 
     .stApp {
         background-color: #1a0a00 !important;
     }
 
-    html, body, .stMarkdown, p, label {
-        color: #ffffff !important;
+    /* Ép iframe bản đồ mở rộng phủ kín 100% chiều cao màn hình */
+    iframe {
+        background-color: transparent !important;
+        height: 100vh !important;
+        width: 100% !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
     }
 
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #331400 0%, #1f0c00 100%) !important;
-        border-right: 2px solid #ff6600 !important;
-        box-shadow: 5px 0px 15px rgba(255, 102, 0, 0.4) !important;
+    [data-element-container="true"], [data-testid="stMainBlockContainer"], div[element-id] {
+        background-color: transparent !important;
+        height: 100vh !important;
     }
 
-    /* TRONG SUỐT THANH HEADER TÊN CÙNG */
+    /* TRONG SUỐT THANH HEADER TRÊN CÙNG */
     header[data-testid="stHeader"] {
         background-color: transparent !important;
         background: transparent !important;
+        z-index: 999999 !important;
     }
 
     header[data-testid="stHeader"] * {
@@ -48,18 +61,12 @@ st.markdown("""
         fill: #ffffff !important;
     }
 
-    /* ================= TRONG SUỐT KHU VỰC BẢN ĐỒ VÀ PHẦN DƯỚI BẢN ĐỒ ================= */
-    /* Làm trong suốt iframe chứa bản đồ folium và các container xung quanh */
-    iframe {
-        background-color: transparent !important;
-    }
-    
-    [data-element-container="true"] {
-        background-color: transparent !important;
-    }
-
-    .stMainBlockContainer, [data-testid="stMainBlockContainer"] {
-        background-color: transparent !important;
+    /* SIDEBAR STYLING */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #331400 0%, #1f0c00 100%) !important;
+        border-right: 2px solid #ff6600 !important;
+        box-shadow: 5px 0px 15px rgba(255, 102, 0, 0.4) !important;
+        z-index: 1000000 !important;
     }
 
     .robot-title {
@@ -183,19 +190,6 @@ st.markdown("""
         color: #00f0ff !important;
     }
 
-    [data-testid="stSidebarCollapseButton"] button:hover,
-    [data-testid="stSidebarExpandButton"] button:hover {
-        background-color: #00f0ff !important;
-        box-shadow: 0 0 20px #00f0ff, 0 0 35px #00f0ff !important;
-        transform: scale(1.1) !important;
-    }
-
-    [data-testid="stSidebarCollapseButton"] button:hover svg,
-    [data-testid="stSidebarExpandButton"] button:hover svg {
-        fill: #000000 !important;
-        color: #000000 !important;
-    }
-
     /* MENU TRÊN BẢN ĐỒ (FOLIUM LAYER CONTROL) */
     .leaflet-control-layers {
         background: rgba(31, 12, 0, 0.4) !important;
@@ -215,16 +209,27 @@ st.markdown("""
         box-shadow: 0 0 8px rgba(0, 240, 255, 0.5) !important;
     }
 
-    .leaflet-control-layers-expanded {
-        padding: 10px 14px !important;
-        color: #ffffff !important;
+    /* ================= DI CHUYỂN DẤU + - XUỐNG DƯỚI BẢN ĐỒ ================= */
+    .leaflet-top.leaflet-left {
+        top: auto !important;
+        bottom: 30px !important;
+        left: 20px !important;
     }
 
-    .leaflet-control-layers-overlays label, 
-    .leaflet-control-layers-base label {
-        color: #ffffff !important;
-        font-weight: 600 !important;
-        text-shadow: 0 0 4px rgba(0, 0, 0, 0.8) !important;
+    .leaflet-control-zoom {
+        border: 1px solid #00f0ff !important;
+        box-shadow: 0 0 10px rgba(0, 240, 255, 0.5) !important;
+    }
+
+    .leaflet-control-zoom a {
+        background-color: rgba(31, 12, 0, 0.8) !important;
+        color: #00f0ff !important;
+        border-bottom: 1px solid rgba(0, 240, 255, 0.3) !important;
+    }
+
+    .leaflet-control-zoom a:hover {
+        background-color: #00f0ff !important;
+        color: #000000 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -239,10 +244,9 @@ def load_data(file_path):
     except Exception:
         return pd.DataFrame()
 
-# 4. THUẬT TOÁN TỐI ƯU LỘ TRÌNH VÒNG KÍN (ROUND-TRIP: BẮT ĐẦU = KẾT THÚC)
+# 4. THUẬT TOÁN TỐI ƯU LỘ TRÌNH VÒNG KÍN (ROUND-TRIP)
 def get_optimized_route_roundtrip(origin, points_list):
     all_points = [{'Name': 'GPS ORIGIN', 'Latitude': origin[0], 'Longitude': origin[1]}] + points_list
-    
     coords_str = ";".join([f"{pt['Longitude']},{pt['Latitude']}" for pt in all_points])
     table_url = f"http://router.project-osrm.org/table/v1/driving/{coords_str}?annotations=duration,distance"
     
@@ -252,7 +256,6 @@ def get_optimized_route_roundtrip(origin, points_list):
             return None, [], 0, 0
             
         durations = res['durations']
-        
         unvisited = list(range(1, len(all_points)))
         current_idx = 0
         ordered_indices = []
@@ -389,7 +392,8 @@ if st.session_state.current_loc:
 else:
     map_center = [df['Latitude'].mean(), df['Longitude'].mean()]
 
-m = folium.Map(location=map_center, zoom_start=14, tiles=None)
+# Khởi tạo bản đồ Folium với vị trí zoom mặc định
+m = folium.Map(location=map_center, zoom_start=14, tiles=None, zoom_control=True)
 
 folium.TileLayer(
     tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
@@ -448,5 +452,5 @@ if st.session_state.route_coords:
 
 folium.LayerControl().add_to(m)
 
-# Tăng chiều cao lên 100vh để bản đồ kéo dài phủ kín toàn bộ chiều cao màn hình
-st_folium(m, use_container_width=True, height=1000)
+# Hiển thị bản đồ tràn màn hình
+st_folium(m, use_container_width=True, height=None)
