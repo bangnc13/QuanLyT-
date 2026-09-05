@@ -106,46 +106,4 @@ st.markdown("""
         background: linear-gradient(135deg, #00f0ff 0%, #7000ff 100%) !important;
         border: none !important;
         border-radius: 4px !important;
-        padding: 12px 24px !important;
-        text-transform: uppercase !important;
-        letter-spacing: 1.5px !important;
-        clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%);
-        transition: all 0.3s ease-in-out !important;
-        box-shadow: 0 0 15px rgba(0, 240, 255, 0.4) !important;
-    }
-
-    div.stButton > button:hover {
-        transform: scale(1.03) translateY(-2px) !important;
-        box-shadow: 0 0 25px rgba(0, 240, 255, 0.8), 0 0 10px rgba(112, 0, 255, 0.8) !important;
-        color: #ffffff !important;
-    }
-
-    .hud-card {
-        background: rgba(51, 20, 0, 0.85) !important;
-        border: 1px solid #ff6600 !important;
-        border-left: 4px solid #00f0ff !important;
-        border-radius: 6px;
-        padding: 12px;
-        margin-top: 10px;
-        box-shadow: inset 0 0 10px rgba(255, 102, 0, 0.2);
-        font-family: 'Rajdhani', sans-serif;
-    }
-
-    .hud-label { color: #ffffff !important; font-size: 0.85rem; text-transform: uppercase; }
-    .hud-value { color: #00f0ff !important; font-size: 1.3rem; font-weight: bold; font-family: 'Orbitron', sans-serif; }
-    hr { border-color: #ff6600 !important; opacity: 0.5; }
-
-    [data-baseweb="select"] > div { background-color: #1f0c00 !important; border: 1px solid #ff6600 !important; color: #00f0ff !important; }
-    [data-baseweb="select"] div[role="button"], [data-baseweb="select"] input, [data-baseweb="select"] input::placeholder { color: #00f0ff !important; -webkit-text-fill-color: #00f0ff !important; }
-    span[data-baseweb="tag"] { background-color: rgba(0, 240, 255, 0.2) !important; border: 1px solid #00f0ff !important; }
-    span[data-baseweb="tag"] * { color: #00f0ff !important; font-weight: bold !important; }
-    ul[role="listbox"] { background-color: #1f0c00 !important; border: 1px solid #00f0ff !important; }
-    li[role="option"] span, li[role="option"] div { color: #00f0ff !important; }
-    li[role="option"]:hover { background-color: rgba(0, 240, 255, 0.2) !important; }
-</style>
-""", unsafe_allow_html=True)
-
-# 3. Hàm phụ trợ
-def haversine(lat1, lon1, lat2, lon2):
-    r = 6371000
-    phi1, phi2 = radians(lat1
+        padding: 12px 2
