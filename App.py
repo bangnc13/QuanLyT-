@@ -8,12 +8,12 @@ import streamlit.components.v1 as components
 
 # 1. Cấu hình trang Streamlit
 st.set_page_config(
-    page_title="TQG - Xác Định Vị Trí Đứt Cáp & Tối Ưu Lộ Trình",
+    page_title="TQG - Xác Định Vị Trí & Tối Ưu Lộ Trình",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS Dark Mode & Giao diện Sidebar giống ảnh
+# CSS Tùy chỉnh Dark Theme toàn bộ App & Sidebar
 st.markdown("""
     <style>
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
@@ -25,7 +25,7 @@ st.markdown("""
             color: #E2E8F0 !important;
         }
 
-        /* Sidebar Style */
+        /* Sidebar Dark Mode */
         section[data-testid="stSidebar"] {
             background-color: #1E293B !important;
             z-index: 999999 !important;
@@ -46,10 +46,10 @@ st.markdown("""
         .sidebar-subtitle {
             font-size: 0.75rem !important;
             color: #94A3B8 !important;
-            margin-bottom: 12px !important;
+            margin-bottom: 10px !important;
         }
 
-        /* Style nút "Tôi đang đứng" màu đỏ giống ảnh */
+        /* Custom style cho nút "Tôi đang đứng" màu đỏ giống giao diện mẫu */
         div.stButton > button[key="btn_my_location"] {
             background-color: #EF4444 !important;
             color: white !important;
@@ -102,17 +102,19 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Khởi tạo Session State
-if "user_gps" not in st.session_state:
-    st.session_state.user_gps = None
+# Khởi tạo session state
 if "break_result" not in st.session_state:
     st.session_state.break_result = None
 if "break_gps" not in st.session_state:
     st.session_state.break_gps = None
 if "selected_pops" not in st.session_state:
     st.session_state.selected_pops = []
+if "user_gps" not in st.session_state:
+    st.session_state.user_gps = None
+if "calculated_route" not in st.session_state:
+    st.session_state.calculated_route = []
 
-# Đọc GPS truyền từ JavaScript vào URL Parameters
+# Đọc GPS truyền qua URL parameters từ JS Geolocation
 query_params = st.query_params
 if "user_lat" in query_params and "user_lon" in query_params:
     try:
@@ -131,7 +133,7 @@ def haversine(coord1, coord2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
-# Tối ưu hóa thứ tự di chuyển qua các điểm (Lộ trình ngắn nhất - Nearest Neighbor)
+# Thuật toán Nearest Neighbor tính toán lộ trình tối ưu qua các tập điểm
 def calculate_optimal_route(start_gps, pop_locations):
     if not pop_locations:
         return []
@@ -156,6 +158,7 @@ def load_server_data():
         "data.xlsx", 
         "Danh-Sách-Đoạn-Cáp.xls"
     ]
+    
     selected_file = None
     for f in possible_files:
         if os.path.exists(f):
@@ -174,13 +177,11 @@ def load_server_data():
 
 df, file_name = load_server_data()
 
-# Giao diện Sidebar
 st.sidebar.markdown('<div class="sidebar-title">⚡ TQG - Tuyến Đường</div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="sidebar-subtitle">Voice by BangNC13 - FPT Telecom System</div>', unsafe_allow_html=True)
 
-# Nút "📍 Tôi đang đứng" giống hệt giao diện trong ảnh
+# 1. Nút "📍 Tôi đang đứng"
 if st.sidebar.button("📍 Tôi đang đứng", key="btn_my_location", use_container_width=True):
-    # Kích hoạt JavaScript để xin quyền truy cập vị trí thiết bị
     components.html("""
         <script>
             if (navigator.geolocation) {
@@ -192,7 +193,7 @@ if st.sidebar.button("📍 Tôi đang đứng", key="btn_my_location", use_conta
                     url.searchParams.set('user_lon', lon);
                     window.parent.location.href = url.toString();
                 }, function(error) {
-                    alert("Không thể lấy vị trí. Vui lòng bật GPS / Cho phép quyền truy cập vị trí trên trình duyệt!");
+                    alert("Không thể lấy vị trí. Vui lòng bật GPS / Cho phép quyền truy cập vị trí!");
                 }, { enableHighAccuracy: true });
             } else {
                 alert("Trình duyệt không hỗ trợ Định vị GPS.");
@@ -213,7 +214,8 @@ if df is not None:
         lon_col1 = next((c for c in df.columns if 'lng' in c.lower() or 'lon' in c.lower() or 'kinh độ' in c.lower()), None)
 
     st.sidebar.markdown("---")
-    
+
+    # 2. Bộ lọc danh sách các POP (Tập điểm)
     if 'Tên đoạn cáp' in df.columns:
         df['POP'] = df['Tên đoạn cáp'].apply(lambda x: str(x).split('.')[0] if '.' in str(x) else str(x))
         pop_list = sorted(df['POP'].unique())
@@ -255,30 +257,31 @@ if df is not None:
         if k1 and k2:
             G.add_edge(k1, k2, cable=cable, length=length)
 
-    # Hiển thị lộ trình nếu đã nhận diện GPS & có chọn POP
-    pop_targets = []
-    for node, coords in node_coords.items():
-        pop_targets.append({"name": node, "coords": coords})
+    # 3. Nút "Bấm" tính toán lộ trình
+    if st.sidebar.button("🚀 Bấm", use_container_width=True, type="secondary"):
+        if not st.session_state.user_gps:
+            st.sidebar.warning("⚠️ Vui lòng bấm '📍 Tôi đang đứng' trước để lấy mốc xuất phát!")
+        elif not selected_pops:
+            st.sidebar.warning("⚠️ Vui lòng chọn ít nhất 1 POP để tính toán lộ trình!")
+        else:
+            target_locations = [{"name": node, "coords": coords} for node, coords in node_coords.items()]
+            st.session_state.calculated_route = calculate_optimal_route(st.session_state.user_gps, target_locations)
+            st.rerun()
 
-    optimal_route = []
+    # Thống kê & Hiển thị kết quả lộ trình
     if st.session_state.user_gps:
-        st.sidebar.success(f"📍 Đã lấy mốc xuất phát: `{st.session_state.user_gps[0]:.5f}, {st.session_state.user_gps[1]:.5f}`")
-        if selected_pops and pop_targets:
-            optimal_route = calculate_optimal_route(st.session_state.user_gps, pop_targets)
-            
-            st.sidebar.markdown("### 🚗 LỘ TRÌNH DỰ KIẾN (TỐI ƯU)")
-            st.sidebar.markdown("**Thứ tự di chuyển đề xuất:**")
-            
-            # Tạo link Google Maps Directions
-            waypoints_str = "/".join([f"{item['coords'][0]},{item['coords'][1]}" for item in optimal_route])
-            gmaps_dir_url = f"https://www.google.com/maps/dir/{st.session_state.user_gps[0]},{st.session_state.user_gps[1]}/{waypoints_str}"
-            
-            for idx, step in enumerate(optimal_route, 1):
-                st.sidebar.markdown(f"**{idx}.** Điểm `{step['name']}`")
+        st.sidebar.success(f"📍 Tọa độ của bạn: `{st.session_state.user_gps[0]:.5f}, {st.session_state.user_gps[1]:.5f}`")
 
-            st.sidebar.link_button("🗺️ Mở Lộ Trình Trên Google Maps", gmaps_dir_url, type="primary", use_container_width=True)
-    else:
-        st.sidebar.warning("Vui lòng bấm '📍 Tôi đang đứng' trước để lấy mốc xuất phát!")
+    if st.session_state.calculated_route:
+        st.sidebar.markdown("### 🚗 LỘ TRÌNH TỐI ƯU")
+        
+        waypoints_str = "/".join([f"{item['coords'][0]},{item['coords'][1]}" for item in st.session_state.calculated_route])
+        gmaps_url = f"https://www.google.com/maps/dir/{st.session_state.user_gps[0]},{st.session_state.user_gps[1]}/{waypoints_str}"
+        
+        for idx, step in enumerate(st.session_state.calculated_route, 1):
+            st.sidebar.markdown(f"**{idx}.** Điểm `{step['name']}`")
+            
+        st.sidebar.link_button("🗺️ Mở lộ trình trên Google Maps", gmaps_url, type="primary", use_container_width=True)
 
     # Dữ liệu Bản đồ
     map_center = [21.0285, 105.8542]
@@ -295,7 +298,7 @@ if df is not None:
     polylines = []
     markers = []
 
-    # Vẽ tuyến cáp mặc định
+    # Tuyến cáp
     for u, v, data in G.edges(data=True):
         if u in node_coords and v in node_coords:
             polylines.append({
@@ -306,7 +309,7 @@ if df is not None:
                 "tooltip": f"Cáp: {data.get('cable', '')}"
             })
 
-    # Vẽ các điểm tập điểm
+    # Markers các điểm kết nối
     for node_id, coord in node_coords.items():
         markers.append({
             "coords": coord,
@@ -316,19 +319,18 @@ if df is not None:
             "radius": 5
         })
 
-    # Vẽ đường Lộ trình tối ưu (Đường màu đỏ/cam nổi bật nối từ vị trí đứng qua các điểm)
-    route_polyline = []
-    if st.session_state.user_gps and optimal_route:
-        route_coords = [list(st.session_state.user_gps)] + [list(item['coords']) for item in optimal_route]
+    # Đường nét đứt màu cam nối lộ trình di chuyển
+    route_polyline = None
+    if st.session_state.user_gps and st.session_state.calculated_route:
+        r_coords = [list(st.session_state.user_gps)] + [list(item['coords']) for item in st.session_state.calculated_route]
         route_polyline = {
-            "coords": route_coords,
+            "coords": r_coords,
             "color": "#F59E0B",
             "weight": 5,
             "opacity": 0.9,
             "dashArray": "8, 8"
         }
 
-    # Leaflet HTML Render
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -377,14 +379,14 @@ if df is not None:
                 }};
                 L.control.layers(baseMaps, null, {{ position: 'topright' }}).addTo(map);
 
-                // Vẽ các tuyến cáp
+                // Polylines cáp
                 var polylinesData = {json.dumps(polylines)};
                 polylinesData.forEach(function(item) {{
                     var line = L.polyline(item.coords, {{ color: item.color, weight: item.weight, opacity: item.opacity }}).addTo(map);
                     if (item.tooltip) line.bindTooltip(item.tooltip);
                 }});
 
-                // Vẽ các điểm POP
+                // Markers điểm KN
                 var markersData = {json.dumps(markers)};
                 markersData.forEach(function(item) {{
                     var circle = L.circleMarker(item.coords, {{
@@ -394,15 +396,15 @@ if df is not None:
                     if (item.tooltip) circle.bindTooltip(item.tooltip);
                 }});
 
-                // Vẽ vị trí người dùng (Điểm xuất phát)
+                // Vị trí người dùng đứng
                 var userGps = {json.dumps(st.session_state.user_gps)};
                 if (userGps) {{
                     var userIcon = L.divIcon({{ className: 'user-start-marker' }});
                     L.marker(userGps, {{ icon: userIcon }}).addTo(map)
-                        .bindPopup("<b>📍 Vị trí bạn đang đứng (Mốc xuất phát)</b>").openPopup();
+                        .bindPopup("<b>📍 Vị trí bạn đang đứng</b>").openPopup();
                 }}
 
-                // Vẽ đường lộ trình tối ưu nối các điểm
+                // Lộ trình tối ưu
                 var routeData = {json.dumps(route_polyline)};
                 if (routeData && routeData.coords) {{
                     L.polyline(routeData.coords, {{
@@ -423,4 +425,4 @@ if df is not None:
     components.html(leaflet_html, height=1000, scrolling=False)
 
 else:
-    st.error("❌ Không tìm thấy file Excel trên Server. Vui lòng kiểm tra lại file data.")
+    st.error("❌ Không tìm thấy file Excel trên Server. Vui lòng kiểm tra lại file data trong thư mục.")
