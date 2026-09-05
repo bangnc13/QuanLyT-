@@ -4,13 +4,12 @@ import numpy as np
 import folium
 from streamlit_folium import st_folium
 
-# 1. Cấu hình trang & Ép Sidebar luôn mở ở trạng thái ban đầu
-st.set_page_config(layout="wide", page_title="TQG - XÁC ĐỊNH VỊ TRÍ DỨT CÁP", initial_sidebar_state="expanded")
+# 1. Cấu hình trang & Sidebar mở mặc định
+st.set_page_config(layout="wide", page_title="TQG - Tuyến đường", initial_sidebar_state="expanded")
 
-# 2. CSS Sửa lỗi hiển thị & Khôi phục Menu bên trái
+# 2. Styling CSS Giao diện Clean Light
 st.markdown("""
     <style>
-        /* Sửa lề ứng dụng */
         .stApp {
             background-color: #f8f9fa;
         }
@@ -18,7 +17,7 @@ st.markdown("""
             padding: 0rem !important;
         }
         
-        /* Hiển thị rõ nét nút đóng/mở Sidebar ở góc trên trái */
+        /* Đảm bảo nút đóng/mở Sidebar hiển thị rõ nét */
         [data-testid="stSidebarCollapseButton"] {
             background-color: #ffffff !important;
             border: 1px solid #dcdfe6 !important;
@@ -28,28 +27,29 @@ st.markdown("""
             z-index: 999999 !important;
         }
 
-        /* Định dạng Menu Sidebar bên trái chuẩn sáng */
+        /* Định dạng Sidebar bên trái */
         section[data-testid="stSidebar"] {
             background-color: #f0f2f5 !important;
             border-right: 1px solid #dcdfe6 !important;
-            min-width: 320px !important;
-            max-width: 360px !important;
+            min-width: 300px !important;
+            max-width: 340px !important;
+            padding-top: 1rem;
         }
         
-        section[data-testid="stSidebar"] .stMarkdown h3 {
-            font-size: 16px !important;
-            font-weight: 700 !important;
-            color: #27ae60 !important;
-            margin-bottom: 2px !important;
-        }
-        
-        /* Chỉnh style cho các nút Xác định / Xóa */
+        /* Styling Nút Bấm */
         div.stButton > button {
             width: 100%;
-            border-radius: 4px;
+            background-color: #27ae60;
+            color: white;
+            border-radius: 6px;
             font-weight: bold;
             border: none;
-            padding: 8px 16px;
+            padding: 10px 16px;
+            margin-top: 10px;
+        }
+        div.stButton > button:hover {
+            background-color: #219150;
+            color: white;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -96,14 +96,14 @@ def solve_tsp(selected_df):
         
     return path, total_dist
 
-# 5. Khai báo Thanh Menu Sidebar Bên Trái
+# 5. Thanh Menu Sidebar đã tối giản & Đổi tên
 with st.sidebar:
-    st.markdown("### ⚡ TQG-XÁC ĐỊNH VỊ TRÍ DỨT CÁP")
-    st.markdown("<p style='color: #2ab7ca; font-size: 11px; margin-bottom: 15px;'>Make by BangNC13</p>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #27ae60; font-size: 18px; margin-bottom: 2px;'>⚡ TQG - Tuyến đường</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #2ab7ca; font-size: 11px; margin-bottom: 20px;'>Make by BangNC13</p>", unsafe_allow_html=True)
     
     all_objects = df['Tên đối tượng'].tolist()
     
-    # 5.1 Lọc dữ liệu POP
+    # Chỉ giữ lại Mục Lọc dữ liệu POP
     st.markdown("**LỌC DỮ LIỆU POP**")
     selected_names = st.multiselect(
         "Lọc dữ liệu POP",
@@ -112,26 +112,8 @@ with st.sidebar:
         label_visibility="collapsed"
     )
     
-    st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #dcdfe6;'>", unsafe_allow_html=True)
-    
-    # 5.2 Thông tin đo OTDR
-    st.markdown("**📍 THÔNG TIN ĐO (OTDR)**")
-    
-    st.caption("Điểm đo (Đang đứng)")
-    start_node_name = st.selectbox("Start Node", options=selected_names if selected_names else all_objects, label_visibility="collapsed")
-    
-    st.caption("Hướng đo (Xuôi ngọn / Về ODF)")
-    end_node_name = st.selectbox("End Node", options=selected_names if selected_names else all_objects, index=min(1, len(selected_names)-1), label_visibility="collapsed")
-    
-    st.caption("Chiều dài đo được (Mét)")
-    measure_dist = st.number_input("Dist", value=170.00, step=10.0, format="%.2f", label_visibility="collapsed")
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        st.button("📌 Xác định", type="primary")
-    with col2:
-        st.button("🗑️ Xóa")
+    # Thêm nút Bấm
+    btn_click = st.button("Bấm")
 
 # 6. Hiển thị Bản đồ bên phải
 if len(selected_names) < 2:
@@ -144,7 +126,7 @@ else:
     center_lat = ordered_df['Latitude'].mean()
     center_lon = ordered_df['Longitude'].mean()
 
-    # Khởi tạo bản đồ Google Maps Sáng
+    # Tạo bản đồ Google Maps Standard
     m = folium.Map(
         location=[center_lat, center_lon], 
         zoom_start=12,
@@ -153,14 +135,14 @@ else:
         attr="Google Maps Standard"
     )
 
-    # Đưa nút Zoom (+ -) xuống góc dưới phải
+    # Đưa nút Zoom (+ -) xuống góc dưới bên phải
     m.get_root().html.add_child(folium.Element('''
         <script>
             L.control.zoom({ position: 'bottomright' }).addTo(map);
         </script>
     '''))
 
-    # Nút bấm nổi ở góc trên trái của Bản đồ (Cách lề 60px để không dính nút Menu)
+    # Nút bấm góc trên trái bản đồ
     first_target_lat = ordered_df.iloc[0]['Latitude']
     first_target_lon = ordered_df.iloc[0]['Longitude']
     direct_gmaps_url = f"https://www.google.com/maps/dir/?api=1&destination={first_target_lat},{first_target_lon}"
@@ -168,7 +150,7 @@ else:
     map_overlay_buttons = f'''
     <div style="
         position: fixed; 
-        top: 15px; 
+        top: 12px; 
         left: 65px; 
         z-index: 9999; 
         display: flex;
@@ -207,7 +189,7 @@ else:
             align-items: center;
             gap: 5px;
         ">
-            🛣️ Chỉ đường tới điểm sự cố
+            🛣️ Chỉ đường tới điểm
         </a>
     </div>
 
@@ -269,5 +251,5 @@ else:
             icon=folium.DivIcon(html=marker_icon_html)
         ).add_to(m)
 
-    # Hiển thị bản đồ
+    # Render bản đồ tràn khung
     st_folium(m, width="100%", height=850, returned_objects=[])
