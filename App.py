@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import folium
+import streamlit.components.v1 as components
 from streamlit_folium import st_folium
 from streamlit_js_eval import get_geolocation
 
@@ -426,3 +427,28 @@ if st.session_state.route_coords:
     ).add_to(m)
 
 st_folium(m, use_container_width=True, height=1000)
+
+# TỰ ĐỘNG ẨN SIDEBAR KHI CHẠM/CLICK VÀO BẢN ĐỒ
+components.html("""
+<script>
+    const parentDoc = window.parent.document;
+    
+    function attachMapClickListener() {
+        const iframes = parentDoc.querySelectorAll('iframe');
+        iframes.forEach(iframe => {
+            try {
+                iframe.contentWindow.document.addEventListener('click', function() {
+                    const collapseBtn = parentDoc.querySelector('[data-testid="stSidebarCollapseButton"] button');
+                    if (collapseBtn) {
+                        collapseBtn.click();
+                    }
+                });
+            } catch (e) {
+                // Bỏ qua lỗi cross-origin đối với iframe bên thứ ba
+            }
+        });
+    }
+
+    setTimeout(attachMapClickListener, 1500);
+</script>
+""", height=0, width=0)
