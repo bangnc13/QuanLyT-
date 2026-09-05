@@ -4,10 +4,9 @@ import numpy as np
 import folium
 import requests
 from streamlit_folium import st_folium
-from streamlit_js_eval import get_geolocation
 
-# 1. Cấu hình giao diện
-st.set_page_config(layout="wide", page_title="TQG - Tuyến đường thu cước", initial_sidebar_state="expanded")
+# 1. Cấu hình giao diện & CSS Custom
+st.set_page_config(layout="wide", page_title="TQG - Tuyến đường", initial_sidebar_state="expanded")
 
 st.markdown("""
     <style>
@@ -42,7 +41,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 2. Load dữ liệu Excel
+# 2. Nạp dữ liệu Excel
 @st.cache_data
 def load_data():
     df = pd.read_excel('QuanLyTĐ.xlsx', sheet_name='TĐ')
@@ -55,7 +54,7 @@ except Exception as e:
     st.error(f"[SYSTEM ERROR]: Không thể nạp dữ liệu: {e}")
     st.stop()
 
-# 3. Hàm tính tuyến đường xe máy thực tế (OSRM Engine)
+# 3. Thuật toán OSRM tính lộ trình thực tế
 def get_osrm_route(coords_list):
     loc_str = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
     url = f"http://router.project-osrm.org/route/v1/driving/{loc_str}?overview=full&geometries=geojson"
@@ -69,7 +68,7 @@ def get_osrm_route(coords_list):
         pass
     return coords_list
 
-# 4. Thuật toán sắp xếp thứ tự lộ trình từ vị trí xuất phát
+# 4. Thuật toán TSP tìm lộ trình tối ưu xuất phát từ GPS của bạn
 def haversine_matrix(coords):
     rads = np.radians(coords)
     lats, lons = rads[:, 0], rads[:, 1]
@@ -96,35 +95,79 @@ def solve_tsp_from_start(selected_df):
     return path
 
 # 5. Khởi tạo Session State
-if 'user_loc' not in st.session_state:
-    st.session_state['user_loc'] = None
+if 'user_lat' not in st.session_state:
+    st.session_state['user_lat'] = None
+if 'user_lon' not in st.session_state:
+    st.session_state['user_lon'] = None
 if 'is_routed' not in st.session_state:
     st.session_state['is_routed'] = False
 
-# 6. Thanh Menu Sidebar
+# Nhận tọa độ GPS nhanh từ URL Parameters
+query_params = st.query_params
+if "lat" in query_params and "lon" in query_params:
+    try:
+        st.session_state['user_lat'] = float(query_params["lat"])
+        st.session_state['user_lon'] = float(query_params["lon"])
+    except:
+        pass
+
+# 6. Thanh Menu Sidebar Bên Trái
 with st.sidebar:
     st.markdown("<h3 style='color: #27ae60; font-size: 18px; margin-bottom: 2px;'>⚡ TQG - Tuyến đường</h3>", unsafe_allow_html=True)
     st.markdown("<p style='color: #2ab7ca; font-size: 11px; margin-bottom: 15px;'>Make by BangNC13</p>", unsafe_allow_html=True)
+    
+    # Nút bấm lấy GPS Siêu Tốc bằng HTML5 Native Geolocation
+    st.components.v1.html("""
+        <button id="gps_btn" style="
+            width: 100%;
+            background-color: #ff4d4f;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 10px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        ">📍 Tôi đang đứng</button>
 
-    # Nút bấm lấy vị trí GPS nhanh
-    if st.button("📍 Tôi đang đứng", type="primary"):
-        location = get_geolocation()
-        if location and 'coords' in location:
-            st.session_state['user_loc'] = {
-                'Tên đối tượng': '📍 Vị trí hiện tại của tôi',
-                'Latitude': location['coords']['latitude'],
-                'Longitude': location['coords']['longitude']
-            }
-            st.toast("✅ Đã bắt được tọa độ định vị!")
-        else:
-            st.warning("Đang chờ thiết bị cho phép quyền GPS...")
+        <script>
+            document.getElementById('gps_btn').onclick = function() {
+                var btn = this;
+                btn.innerHTML = "⚡ Đang bắt tín hiệu GPS...";
+                btn.style.backgroundColor = "#e63946";
+                
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(function(position) {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        const url = new URL(window.parent.location.href);
+                        url.searchParams.set('lat', lat);
+                        url.searchParams.set('lon', lon);
+                        window.parent.location.href = url.href;
+                    }, function(error) {
+                        alert("Lỗi: Hãy bật Vị Trí (GPS) trên thiết bị và cấp quyền cho trình duyệt!");
+                        btn.innerHTML = "📍 Tôi đang đứng";
+                        btn.style.backgroundColor = "#ff4d4f";
+                    }, {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    });
+                } else {
+                    alert("Trình duyệt thiết bị không hỗ trợ Geolocation.");
+                }
+            };
+        </script>
+    """, height=50)
 
-    if st.session_state['user_loc'] is not None:
-        st.caption(f"Đã định vị: {st.session_state['user_loc']['Latitude']:.4f}, {st.session_state['user_loc']['Longitude']:.4f}")
+    # Hiển thị thông báo trạng thái GPS thành công
+    if st.session_state['user_lat'] is not None:
+        st.success(f"🟢 GPS ONLINE: {st.session_state['user_lat']:.4f}, {st.session_state['user_lon']:.4f}")
 
     st.markdown("<hr style='margin: 10px 0; border: none; border-top: 1px solid #dcdfe6;'>", unsafe_allow_html=True)
 
-    # Lọc POP
+    # Lọc danh sách POP
     all_objects = df['Tên đối tượng'].tolist()
     st.markdown("**LỌC DỮ LIỆU POP**")
     selected_names = st.multiselect(
@@ -134,7 +177,7 @@ with st.sidebar:
         label_visibility="collapsed"
     )
 
-    # Đổi màu xanh dương cho nút "Bấm" khi đã kích hoạt
+    # Đổi style nút "Bấm" duy trì màu xanh dương khi lộ trình được tạo
     if st.session_state['is_routed']:
         st.markdown("""
             <style>
@@ -148,19 +191,22 @@ with st.sidebar:
     
     btn_type = "primary" if st.session_state['is_routed'] else "secondary"
     if st.button("Bấm", type=btn_type):
-        if st.session_state['user_loc'] is None:
-            st.error("Vui lòng nhấn '📍 Tôi đang đứng' để lấy định vị trước!")
+        if st.session_state['user_lat'] is None:
+            st.error("Chưa có GPS! Nhấn '📍 Tôi đang đứng' trước.")
         else:
             st.session_state['is_routed'] = True
             st.rerun()
 
-# 7. Hiển thị Bản đồ
+# 7. Khởi tạo Bản đồ & Nhúng Badge ONLINE lên Map
 selected_df = df[df['Tên đối tượng'].isin(selected_names)].reset_index(drop=True)
 
-# Tích hợp điểm xuất phát
-if st.session_state['user_loc'] is not None:
-    my_row = pd.DataFrame([st.session_state['user_loc']])
-    full_df = pd.concat([my_row, selected_df], ignore_index=True)
+if st.session_state['user_lat'] is not None:
+    my_loc_row = pd.DataFrame([{
+        'Tên đối tượng': '📍 Vị trí hiện tại của tôi',
+        'Latitude': st.session_state['user_lat'],
+        'Longitude': st.session_state['user_lon']
+    }])
+    full_df = pd.concat([my_loc_row, selected_df], ignore_index=True)
 else:
     full_df = selected_df.copy()
 
@@ -175,17 +221,42 @@ m = folium.Map(
     attr="Google Maps Standard"
 )
 
+# Đưa nút Zoom xuống góc dưới bên phải
 m.get_root().html.add_child(folium.Element('<script>L.control.zoom({ position: "bottomright" }).addTo(map);</script>'))
 
-# Nếu đã nhấn "Bấm": Vẽ tuyến đường và giữ cố định
-if st.session_state['is_routed'] and st.session_state['user_loc'] is not None and len(full_df) > 1:
+# Hiển thị nút "ONLINE / ĐÃ ĐỊNH VỊ" góc trên bên phải Bản đồ
+gps_status_color = "#27ae60" if st.session_state['user_lat'] is not None else "#7f8c8d"
+gps_status_text = "🟢 GPS ONLINE" if st.session_state['user_lat'] is not None else "⚪ GPS OFFLINE"
+
+online_badge_html = f'''
+    <div style="
+        position: fixed;
+        top: 15px;
+        right: 15px;
+        z-index: 9999;
+        background-color: {gps_status_color};
+        color: white;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-family: sans-serif;
+        font-size: 12px;
+        font-weight: bold;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    ">
+        {gps_status_text}
+    </div>
+'''
+m.get_root().html.add_child(folium.Element(online_badge_html))
+
+# 8. Vẽ đường đi hoặc vẽ Marker các điểm
+if st.session_state['is_routed'] and st.session_state['user_lat'] is not None and len(full_df) > 1:
     path_indices = solve_tsp_from_start(full_df)
     ordered_df = full_df.iloc[path_indices].reset_index(drop=True)
 
     raw_coords = ordered_df[['Latitude', 'Longitude']].values.tolist()
     osrm_route = get_osrm_route(raw_coords)
 
-    # Đường lộ trình xanh dương
+    # Đường Polyline màu xanh dương
     folium.PolyLine(
         osrm_route, 
         color="#007bff", 
@@ -200,8 +271,8 @@ if st.session_state['is_routed'] and st.session_state['user_loc'] is not None an
         
         marker_html = f'''
             <div style="font-family:sans-serif; font-size:10pt; color:white; background-color:{bg_color}; 
-                        border:2px solid white; border-radius:50%; width:26px; height:26px; 
-                        text-align:center; line-height:22px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.3);">
+                        border:2px solid white; border-radius:50%; width:28px; height:28px; 
+                        text-align:center; line-height:24px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.3);">
                 {seq_num if not is_my_loc else "🛵"}
             </div>
         '''
@@ -211,7 +282,6 @@ if st.session_state['is_routed'] and st.session_state['user_loc'] is not None an
             icon=folium.DivIcon(html=marker_html)
         ).add_to(m)
 
-# Khi chưa bấm "Bấm": Chỉ thể hiện Marker các điểm
 else:
     for idx, row in full_df.iterrows():
         is_my_loc = (row['Tên đối tượng'] == '📍 Vị trí hiện tại của tôi')
@@ -220,8 +290,8 @@ else:
         
         marker_html = f'''
             <div style="font-family:sans-serif; font-size:10pt; color:white; background-color:{bg_color}; 
-                        border:2px solid white; border-radius:50%; width:26px; height:26px; 
-                        text-align:center; line-height:22px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.3);">
+                        border:2px solid white; border-radius:50%; width:28px; height:28px; 
+                        text-align:center; line-height:24px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.3);">
                 {icon_str}
             </div>
         '''
