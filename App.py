@@ -5,7 +5,7 @@ import folium
 from streamlit_folium import st_folium
 from streamlit_js_eval import get_geolocation
 
-# 1. Cấu hình trang Full-Width
+# 1. Cấu hình trang
 st.set_page_config(
     page_title="Hệ Thống Tối Ưu Lộ Trình - Robotic UI",
     page_icon="🤖",
@@ -13,12 +13,12 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Inject CSS Custom: Clean White Lines, Full Screen Map & Robotic Theme
+# 2. Inject CSS Fix Lỗi Màn Hình Trắng & Styling
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
 
-    /* Ẩn Header mặc định của Streamlit */
+    /* Ẩn Header mặc định */
     header[data-testid="stHeader"] {
         display: none !important;
     }
@@ -30,19 +30,10 @@ st.markdown("""
         max-width: 100% !important;
     }
 
-    /* Ép khung hiển thị Streamlit Folium tràn kín màn hình */
-    .stFolium, iframe {
-        width: 100% !important;
-        height: 100vh !important;
-        border: none !important;
-    }
-
+    /* Ép không gian hiển thị map không bị overflow */
     .stApp {
         background-color: #1a0a00 !important;
-    }
-
-    html, body, .stMarkdown, p, label {
-        color: #ffffff !important;
+        overflow: hidden;
     }
 
     /* Sidebar Styling */
@@ -61,6 +52,17 @@ st.markdown("""
         text-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
         margin-top: 15px;
         margin-bottom: 15px;
+    }
+
+    /* Fix lỗi ô thông báo (st.info, st.error) bị biến thành khối trắng */
+    [data-testid="stSidebar"] [data-testid="stAlert"] {
+        background-color: rgba(51, 20, 0, 0.9) !important;
+        color: #00f0ff !important;
+        border: 1px solid #ff6600 !important;
+    }
+    
+    [data-testid="stSidebar"] [data-testid="stAlert"] * {
+        color: #00f0ff !important;
     }
 
     div.stButton > button {
@@ -91,7 +93,6 @@ st.markdown("""
         border-radius: 6px;
         padding: 10px 12px;
         margin-top: 5px !important;
-        margin-bottom: 0px !important;
         box-shadow: inset 0 0 10px rgba(255, 102, 0, 0.2);
         font-family: 'Rajdhani', sans-serif;
     }
@@ -113,12 +114,11 @@ st.markdown("""
         gap: 0.5rem !important;
     }
 
-    /* Triệt tiêu đường vạch kẻ trắng st.divider */
     hr {
         display: none !important;
     }
 
-    /* MULTISELECT UI FIX */
+    /* Multiselect UI */
     [data-baseweb="select"] > div {
         background-color: #1f0c00 !important;
         border: 1px solid #ff6600 !important;
@@ -167,7 +167,7 @@ def load_data(file_path):
     except Exception:
         return pd.DataFrame()
 
-# 4. Thuật toán tối ưu hóa lộ trình vòng kín (Nearest Neighbor qua OSRM Table)
+# 4. Thuật toán tối ưu hóa lộ trình vòng kín
 def get_optimized_route_roundtrip(origin, points_list):
     all_points = [{'Name': 'GPS ORIGIN', 'Latitude': origin[0], 'Longitude': origin[1]}] + points_list
     coords_str = ";".join([f"{pt['Longitude']},{pt['Latitude']}" for pt in all_points])
@@ -202,7 +202,6 @@ def get_optimized_route_roundtrip(origin, points_list):
             })
             route_coords_str += f";{pt['Longitude']},{pt['Latitude']}"
 
-        # Thêm điểm xuất phát vào cuối để tạo vòng kín (ĐIỂM ĐẾN = ĐIỂM BẮT ĐẦU)
         route_coords_str += f";{origin[1]},{origin[0]}"
 
         route_url = f"http://router.project-osrm.org/route/v1/driving/{route_coords_str}?overview=full&geometries=geojson"
@@ -220,7 +219,6 @@ def get_optimized_route_roundtrip(origin, points_list):
         
     return None, [], 0, 0
 
-# Khởi tạo dữ liệu
 df = load_data('QuanLyTĐ.xlsx')
 
 if df.empty:
@@ -239,7 +237,7 @@ if 'ordered_points' not in st.session_state:
 if 'route_summary' not in st.session_state:
     st.session_state.route_summary = None
 
-# ================= SIDEBAR (GIAO DIỆN KHÔNG VẠCH TRẮNG) =================
+# ================= SIDEBAR =================
 with st.sidebar:
     st.markdown("<h2 class='robot-title'>🤖 Make By BangNC13</h2>", unsafe_allow_html=True)
     
@@ -251,7 +249,7 @@ with st.sidebar:
         placeholder="Choose options"
     )
     
-    st.markdown("<div class='hud-label' style='margin-top: 15px;'>📡 TRẠNG THÁI ĐỊNH VỊ GPS:</div>", unsafe_allow_html=True)
+    st.markdown("<div class='hud-label' style='margin-top: 10px; color:#ffffff;'>📡 TRẠNG THÁI ĐỊNH VỊ GPS:</div>", unsafe_allow_html=True)
     loc_data = get_geolocation()
     
     if loc_data and 'coords' in loc_data:
@@ -267,7 +265,7 @@ with st.sidebar:
     else:
         st.info("Bật GPS thiết bị để xác định điểm gốc.")
 
-    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
 
     if st.button("⚡ Bấm xem lộ trình ⚡", use_container_width=True):
         if not st.session_state.current_loc:
@@ -292,7 +290,7 @@ with st.sidebar:
                     }
 
     if st.session_state.route_summary:
-        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
         st.markdown(f"""
         <div class='hud-card'>
             <div class='hud-label'>Tổng quãng đường (Vòng kín)</div>
@@ -308,7 +306,7 @@ with st.sidebar:
             st.markdown(f"<span style='color:#00f0ff;'>[{pt['Order']}]</span> <span style='color:#ffffff;'>{pt['Name']}</span>", unsafe_allow_html=True)
         st.markdown(f"<span style='color:#00f0ff;'>[{len(st.session_state.ordered_points)+1}]</span> <span style='color:#ffffff;'>Quay về vị trí xuất phát</span>", unsafe_allow_html=True)
 
-# ================= MAIN CONTENT MAP (FULL SCREEN) =================
+# ================= MAIN CONTENT MAP =================
 if st.session_state.current_loc:
     map_center = st.session_state.current_loc
 else:
@@ -373,5 +371,5 @@ if st.session_state.route_coords:
 
 folium.LayerControl().add_to(m)
 
-# Hiển thị Bản đồ tràn toàn bộ màn hình
-st_folium(m, width="100%", height=None, use_container_width=True)
+# Truyền height=800 để cố định chiều cao tương thích cực tốt với màn hình mà không bị vỡ iframe
+st_folium(m, width="100%", height=800, use_container_width=True)
