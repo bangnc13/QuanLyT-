@@ -239,7 +239,7 @@ with st.sidebar:
     
     st.divider()
     
-    st.markdown("<div class='hud-label'>📡 Trạng thái định vị GPS:</div>", unsafe_allow_html=True)
+    st.markdown("<div class='hud-label'>📡 :</div>", unsafe_allow_html=True)
     loc_data = get_geolocation()
     
     if loc_data and 'coords' in loc_data:
