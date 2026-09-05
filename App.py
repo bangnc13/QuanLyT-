@@ -205,7 +205,7 @@ with st.sidebar:
     st.divider()
 
     # 3. Nút kích hoạt lộ trình phong cách Robotic
-    if st.button("⚡ KÍCH HOẠT TỐI ƯU ⚡", use_container_width=True):
+    if st.button("⚡ Bấm xem lộ trình ⚡", use_container_width=True):
         if not st.session_state.current_loc:
             st.error("Chưa có tín hiệu GPS!")
         elif not selected_names:
