@@ -1,356 +1,214 @@
+import sys
 import os
-import json
-import math
 import pandas as pd
-import streamlit as st
-import streamlit.components.v1 as components
-
-# 1. Cấu hình trang Streamlit
-st.set_page_config(
-    page_title="TQG - Tối Ưu Lộ Trình Di Chuyển",
-    layout="wide",
-    initial_sidebar_state="expanded"
+import requests
+import folium
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QListWidget, QAbstractItemView, QPushButton, QLabel, QMessageBox
 )
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtCore import QUrl
 
-# CSS Dark Theme
-st.markdown("""
-<style>
-    html, body, [data-testid="stAppViewContainer"], .main, .stApp {
-        margin: 0 !important;
-        padding: 0 !important;
-        height: 100vh !important;
-        overflow: hidden !important;
-        background-color: #0E1117 !important;
-        color: #E2E8F0 !important;
-    }
-
-    section[data-testid="stSidebar"] {
-        background-color: #1E293B !important;
-        z-index: 999999 !important;
-        border-right: 1px solid #334155 !important;
-    }
-    section[data-testid="stSidebar"] > div:first-child {
-        padding-top: 1rem !important;
-        padding-left: 0.8rem !important;
-        padding-right: 0.8rem !important;
-    }
-
-    .sidebar-title {
-        font-size: 1.2rem !important;
-        font-weight: 800 !important;
-        color: #38BDF8 !important;
-        margin-bottom: 2px !important;
-    }
-    .sidebar-subtitle {
-        font-size: 0.75rem !important;
-        color: #94A3B8 !important;
-        margin-bottom: 10px !important;
-    }
-
-    header[data-testid="stHeader"] {
-        background: transparent !important;
-        height: 0px !important;
-        z-index: 999999 !important;
-    }
-
-    .main .block-container, 
-    [data-testid="stMainBlockContainer"],
-    [data-testid="stVerticalBlock"],
-    [data-testid="stVerticalBlockBorderWrapper"] {
-        padding: 0 !important;
-        margin: 0 !important;
-        gap: 0rem !important;
-        max-width: 100vw !important;
-        height: 100vh !important;
-    }
-
-    iframe {
-        width: 100vw !important;
-        height: 100vh !important;
-        border: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        display: block !important;
-    }
-    
-    div[data-baseweb="select"] > div {
-        background-color: #0F172A !important;
-        color: #F8FAFC !important;
-        border-color: #334155 !important;
-    }
-    input {
-        background-color: #0F172A !important;
-        color: #F8FAFC !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# Khởi tạo session state
-if "selected_pops" not in st.session_state:
-    st.session_state.selected_pops = []
-if "user_gps" not in st.session_state:
-    st.session_state.user_gps = None
-if "calculated_route" not in st.session_state:
-    st.session_state.calculated_route = []
-
-# Đọc GPS từ URL
-query_params = st.query_params
-if "user_lat" in query_params and "user_lon" in query_params:
-    try:
-        st.session_state.user_gps = (float(query_params["user_lat"]), float(query_params["user_lon"]))
-    except Exception:
-        pass
-
-def haversine(coord1, coord2):
-    R = 6371.0
-    lat1, lon1 = math.radians(coord1[0]), math.radians(coord1[1])
-    lat2, lon2 = math.radians(coord2[0]), math.radians(coord2[1])
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
-    a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return R * c
-
-def calculate_optimal_route(start_gps, target_points):
-    if not target_points:
-        return []
-    
-    unvisited = target_points.copy()
-    current_pos = start_gps
-    route = []
-
-    while unvisited:
-        nearest_item = min(unvisited, key=lambda item: haversine(current_pos, item['coords']))
-        route.append(nearest_item)
-        current_pos = nearest_item['coords']
-        unvisited.remove(nearest_item)
-
-    return route
-
-@st.cache_data
-def load_local_data():
-    file_path = "QuanLyTĐ.xlsx"
-    if os.path.exists(file_path):
-        df = pd.read_excel(file_path)
-        df.columns = [str(c).strip() for c in df.columns]
-        return df
-    return None
-
-df = load_local_data()
-
-st.sidebar.markdown('<div class="sidebar-title">⚡ TQG - Tuyến Đường</div>', unsafe_allow_html=True)
-st.sidebar.markdown('<div class="sidebar-subtitle">Voice by BangNC13 - FPT Telecom System</div>', unsafe_allow_html=True)
-
-if df is not None:
-    df['POP'] = df['Tên đối tượng'].apply(lambda x: str(x).split('.')[0] if '.' in str(x) else str(x))
-    pop_list = sorted(df['POP'].unique())
-
-    selected_pops = st.sidebar.multiselect(
-        "LỌC DỮ LIỆU POP", 
-        options=pop_list, 
-        default=st.session_state.selected_pops,
-        key="pop_multiselect"
-    )
-    
-    col_r1, col_r2 = st.sidebar.columns([1, 1])
-    with col_r1:
-        if st.button("🔄 Reset bộ lọc", use_container_width=True):
-            st.session_state.selected_pops = []
-            st.session_state.calculated_route = []
-            st.rerun()
-
-    if selected_pops:
-        filtered_df = df[df['POP'].isin(selected_pops)].copy()
-    else:
-        filtered_df = df.copy()
-
-    target_points = []
-    for _, row in filtered_df.iterrows():
-        try:
-            name = str(row['Tên đối tượng']).strip()
-            lat = float(row['Latitude'])
-            lon = float(row['Longitude'])
-            target_points.append({"name": name, "coords": (lat, lon)})
-        except Exception:
-            continue
-
-    st.sidebar.markdown("---")
-    
-    if st.sidebar.button("🚀 Bấm", type="primary", use_container_width=True):
-        if not selected_pops:
-            st.sidebar.warning("⚠️ Vui lòng chọn ít nhất 1 POP để tính lộ trình!")
-        elif not target_points:
-            st.sidebar.error("❌ Không tìm thấy tọa độ hợp lệ.")
-        else:
-            start_pos = st.session_state.user_gps if st.session_state.user_gps else target_points[0]['coords']
-            st.session_state.calculated_route = calculate_optimal_route(start_pos, target_points)
-            st.rerun()
-
-    if st.session_state.calculated_route:
-        st.sidebar.markdown("### 🚗 LỘ TRÌNH TỐI ƯU")
-        for idx, step in enumerate(st.session_state.calculated_route, 1):
-            st.sidebar.markdown(f"**{idx}.** `{step['name']}`")
+class MapApp(QMainWindow):
+    def __init__(self, excel_file='QuanLyTĐ.xlsx'):
+        super().__init__()
+        self.setWindowTitle("Công cụ Tìm đường & Quản lý Tập điểm")
+        self.setGeometry(100, 100, 1200, 700)
+        self.excel_file = excel_file
         
-        if st.session_state.user_gps:
-            waypoints_str = "/".join([f"{item['coords'][0]},{item['coords'][1]}" for item in st.session_state.calculated_route])
-            gmaps_url = f"https://www.google.com/maps/dir/{st.session_state.user_gps[0]},{st.session_state.user_gps[1]}/{waypoints_str}"
-            st.sidebar.link_button("🗺️ Mở lộ trình trên Google Maps", gmaps_url, type="secondary", use_container_width=True)
+        # Biến lưu vị trí
+        self.current_location = None  # (lat, lon)
+        self.df = self.load_data()
+        
+        self.init_ui()
 
-    map_center = [21.816, 105.208]
-    if target_points:
-        map_center = [target_points[0]['coords'][0], target_points[0]['coords'][1]]
+    def load_data(self):
+        """Đọc danh sách tập điểm từ file Excel"""
+        try:
+            df = pd.read_excel(self.excel_file)
+            # Lọc bỏ các dòng thiếu tọa độ
+            df = df.dropna(subset=['Latitude', 'Longitude'])
+            return df
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", f"Không thể đọc file {self.excel_file}: {str(e)}")
+            return pd.DataFrame(columns=['Tên đối tượng', 'Latitude', 'Longitude'])
 
-    markers = [{"coords": pt["coords"], "popup": f"<b>Điểm:</b> {pt['name']}", "tooltip": pt["name"]} for pt in target_points]
+    def init_ui(self):
+        main_widget = QWidget()
+        self.setCentralWidget(main_widget)
+        main_layout = QHBoxLayout(main_widget)
 
-    route_polyline = None
-    if st.session_state.calculated_route:
-        start_pt = list(st.session_state.user_gps) if st.session_state.user_gps else list(st.session_state.calculated_route[0]['coords'])
-        r_coords = [start_pt] + [list(item['coords']) for item in st.session_state.calculated_route]
-        route_polyline = {
-            "coords": r_coords,
-            "color": "#F59E0B",
-            "weight": 4,
-            "opacity": 0.9,
-            "dashArray": "8, 8"
-        }
+        # === BẢNG ĐIỀU KHIỂN BÊN TRÁI ===
+        left_panel = QVBoxLayout()
+        
+        # Label hướng dẫn
+        lbl_select = QLabel("<b>Chọn tập điểm cần đến:</b>")
+        left_panel.addWidget(lbl_select)
+        
+        # Danh sách chọn điểm (Cho phép chọn nhiều điểm nếu muốn)
+        self.list_widget = QListWidget()
+        self.list_widget.setSelectionMode(QAbstractItemView.MultiSelection)
+        self.populate_list()
+        left_panel.addWidget(self.list_widget)
 
-    markers_json = json.dumps(markers)
-    route_polyline_json = json.dumps(route_polyline)
-    map_center_json = json.dumps(map_center)
+        # Nút lấy vị trí hiện tại
+        self.btn_get_location = QPushButton("📍 Lấy vị trí hiện tại")
+        self.btn_get_location.clicked.connect(self.get_current_location)
+        left_panel.addWidget(self.btn_get_location)
 
-    # Sử dụng Template String thay cho f-string nguy hiểm
-    leaflet_html = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <style>
-            html, body { width: 100%; height: 100vh; margin: 0; padding: 0; overflow: hidden; background-color: #0E1117; }
-            #map { width: 100%; height: 100vh; background: #0E1117; }
-            .leaflet-control-layers, .leaflet-bar { background-color: #1E293B !important; border: 1px solid #334155 !important; color: #F8FAFC !important; }
-            .leaflet-control-layers-toggle { filter: invert(1); }
-            .user-location-marker { background-color: #3B82F6; border: 3px solid #FFFFFF; border-radius: 50%; width: 18px !important; height: 18px !important; margin-left: -9px !important; margin-top: -9px !important; box-shadow: 0 0 10px rgba(59, 130, 246, 0.9); }
-            .leaflet-control-locate { background-color: #1E293B; border: 1px solid #334155; border-radius: 4px; width: 34px; height: 34px; line-height: 32px; text-align: center; cursor: pointer; font-size: 18px; }
-        </style>
-    </head>
-    <body>
-        <div id="map"></div>
-        <script>
-            document.addEventListener("DOMContentLoaded", function() {
-                var googleStreets = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20, attribution: 'Google Maps' });
-                var googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, attribution: 'Google Satellite' });
-                var googleHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 20, attribution: 'Google Hybrid' });
+        # Label hiển thị vị trí hiện tại
+        self.lbl_loc_status = QLabel("Vị trí hiện tại: Chưa xác định")
+        left_panel.addWidget(self.lbl_loc_status)
 
-                var map = L.map('map', {
-                    zoomControl: true,
-                    attributionControl: false,
-                    layers: [googleStreets]
-                }).setView(__MAP_CENTER__, 14);
+        # Nút "Bấm" để tính toán lộ trình
+        self.btn_route = QPushButton("Bấm")
+        self.btn_route.setStyleSheet("font-weight: bold; background-color: #007bff; color: white; height: 40px;")
+        self.btn_route.clicked.connect(self.generate_route)
+        left_panel.addWidget(self.btn_route)
 
-                var baseMaps = {
-                    "🗺️ Google Đường phố": googleStreets,
-                    "🛰️ Google Vệ tinh": googleSat,
-                    "🌐 Google Hybrid": googleHybrid
-                };
-                L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+        # Set tỉ lệ khung hình bên trái
+        left_container = QWidget()
+        left_container.setLayout(left_panel)
+        left_container.setMaximumWidth(320)
+        main_layout.addWidget(left_container)
 
-                var markersData = __MARKERS_DATA__;
-                markersData.forEach(function(item) {
-                    var circle = L.circleMarker(item.coords, {
-                        radius: 6, color: '#818CF8', fillColor: '#0F172A', fillOpacity: 0.9, weight: 2
-                    }).addTo(map);
-                    if (item.popup) circle.bindPopup(item.popup);
-                    if (item.tooltip) circle.bindTooltip(item.tooltip);
-                });
+        # === BẢN ĐỒ BÊN PHẢI ===
+        self.web_view = QWebEngineView()
+        main_layout.addWidget(self.web_view, stretch=1)
 
-                var routeData = __ROUTE_DATA__;
-                if (routeData && routeData.coords) {
-                    L.polyline(routeData.coords, {
-                        color: routeData.color,
-                        weight: routeData.weight,
-                        opacity: routeData.opacity,
-                        dashArray: routeData.dashArray
-                    }).addTo(map);
-                }
+        # Render bản đồ ban đầu
+        self.render_map()
 
-                var userMarker = null;
-                var accuracyCircle = null;
+    def populate_list(self):
+        """Nạp danh sách tập điểm vào List Widget"""
+        for _, row in self.df.iterrows():
+            item_text = f"{row['Tên đối tượng']} ({row['Latitude']:.5f}, {row['Longitude']:.5f})"
+            self.list_widget.addItem(item_text)
 
-                function sendGpsToStreamlit(lat, lon) {
-                    const url = new URL(window.parent.location.href);
-                    if (url.searchParams.get('user_lat') !== lat.toString()) {
-                        url.searchParams.set('user_lat', lat);
-                        url.searchParams.set('user_lon', lon);
-                        window.parent.location.href = url.toString();
-                    }
-                }
+    def get_current_location(self):
+        """Lấy vị trí hiện tại dựa trên IP public (hoặc tọa độ mặc định nếu lỗi)"""
+        try:
+            res = requests.get('https://ipinfo.io/json', timeout=5).json()
+            if 'loc' in res:
+                lat, lon = map(float, res['loc'].split(','))
+                self.current_location = (lat, lon)
+                self.lbl_loc_status.setText(f"Vị trí: {lat:.5f}, {lon:.5f}")
+                self.render_map()
+                return
+        except Exception:
+            pass
+        
+        # Nếu không lấy được IP, lấy vị trí trung bình của tập điểm làm mốc giả định
+        if not self.df.empty:
+            avg_lat = self.df['Latitude'].mean()
+            avg_lon = self.df['Longitude'].mean()
+            self.current_location = (avg_lat, avg_lon)
+            self.lbl_loc_status.setText(f"Vị trí (mặc định): {avg_lat:.5f}, {avg_lon:.5f}")
+            self.render_map()
 
-                function updateLocation(pos) {
-                    var lat = pos.coords.latitude;
-                    var lng = pos.coords.longitude;
-                    var latlng = [lat, lng];
-                    var radius = pos.coords.accuracy / 2;
+    def get_osrm_route(self, origin, destination):
+        """Gọi API OSRM để lấy đường đi xe máy/xe cộ"""
+        url = f"http://router.project-osrm.org/route/v1/driving/{origin[1]},{origin[0]};{destination[1]},{destination[0]}?overview=full&geometries=geojson"
+        try:
+            res = requests.get(url, timeout=5).json()
+            if res.get('code') == 'Ok':
+                coords = res['routes'][0]['geometry']['coordinates']
+                # OSRM trả về [lon, lat], cần chuyển sang [lat, lon] cho Folium
+                return [(lat, lon) for lon, lat in coords]
+        except Exception as e:
+            print(f"Lỗi lấy lộ trình: {e}")
+        return [origin, destination]
 
-                    sendGpsToStreamlit(lat, lng);
+    def render_map(self, route_coords=None, selected_points=None):
+        """Tạo bản đồ Folium với Layer Google Maps"""
+        # Xác định trung tâm bản đồ
+        start_center = [21.817, 105.207]
+        if self.current_location:
+            start_center = self.current_location
+        elif not self.df.empty:
+            start_center = [self.df['Latitude'].iloc[0], self.df['Longitude'].iloc[0]]
 
-                    if (userMarker) {
-                        userMarker.setLatLng(latlng);
-                        accuracyCircle.setLatLng(latlng).setRadius(radius);
-                    } else {
-                        var userIcon = L.divIcon({ className: 'user-location-marker' });
-                        userMarker = L.marker(latlng, { icon: userIcon }).addTo(map)
-                            .bindPopup("<b>Vị trí hiện tại của bạn</b>");
-                        accuracyCircle = L.circle(latlng, radius, {
-                            color: '#3B82F6', fillColor: '#3B82F6', fillOpacity: 0.15, weight: 1
-                        }).addTo(map);
-                    }
-                }
+        # Tạo map
+        m = folium.Map(location=start_center, zoom_start=14)
 
-                function handleGPSError(err) {
-                    console.warn("GPS Warning/Error: " + err.message);
-                }
+        # Layer Google Maps Đường Phố
+        folium.TileLayer(
+            tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+            attr='Google',
+            name='Google Maps',
+            overlay=False,
+            control=True
+        ).add_to(m)
 
-                if ("geolocation" in navigator) {
-                    navigator.geolocation.watchPosition(updateLocation, handleGPSError, {
-                        enableHighAccuracy: true,
-                        maximumAge: 0,
-                        timeout: 5000
-                    });
-                }
+        # Layer Google Maps Vệ Tinh
+        folium.TileLayer(
+            tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+            attr='Google',
+            name='Google Satellite',
+            overlay=False,
+            control=True
+        ).add_to(m)
 
-                var locateControl = L.Control.extend({
-                    options: { position: 'topleft' },
-                    onAdd: function (map) {
-                        var container = L.DomUtil.create('div', 'leaflet-control-locate');
-                        container.innerHTML = '🎯';
-                        container.title = "Định vị vị trí của tôi";
-                        container.onclick = function() {
-                            if ("geolocation" in navigator) {
-                                navigator.geolocation.getCurrentPosition(function(pos) {
-                                    var latlng = [pos.coords.latitude, pos.coords.longitude];
-                                    map.flyTo(latlng, 18);
-                                    updateLocation(pos);
-                                }, handleGPSError, { enableHighAccuracy: true, timeout: 3000 });
-                            }
-                        };
-                        return container;
-                    }
-                });
-                map.addControl(new locateControl());
+        # Hiển thị vị trí hiện tại
+        if self.current_location:
+            folium.Marker(
+                location=self.current_location,
+                popup="<b>Vị trí của bạn</b>",
+                icon=folium.Icon(color='red', icon='user', prefix='fa')
+            ).add_to(m)
 
-                setTimeout(function() { map.invalidateSize(); }, 200);
-            });
-        </script>
-    </body>
-    </html>
-    """.replace("__MAP_CENTER__", map_center_json)\
-       .replace("__MARKERS_DATA__", markers_json)\
-       .replace("__ROUTE_DATA__", route_polyline_json)
+        # Hiển thị các điểm được chọn
+        if selected_points:
+            for pt in selected_points:
+                folium.Marker(
+                    location=(pt['Latitude'], pt['Longitude']),
+                    popup=f"<b>{pt['Tên đối tượng']}</b>",
+                    icon=folium.Icon(color='green', icon='flag')
+                ).add_to(m)
 
-    components.html(leaflet_html, height=1000, scrolling=False)
+        # Vẽ lộ trình di chuyển
+        if route_coords:
+            folium.PolyLine(
+                route_coords,
+                color="blue",
+                weight=5,
+                opacity=0.8,
+                tooltip="Lộ trình di chuyển xe máy"
+            ).add_to(m)
 
-else:
-    st.error("❌ Không tìm thấy file `QuanLyTĐ.xlsx` trong thư mục. Vui lòng kiểm tra lại file data trên Server.")
+        folium.LayerControl().add_to(m)
+
+        # Lưu file HTML tạm và load vào QWebEngineView
+        map_path = os.path.abspath("temp_map.html")
+        m.save(map_path)
+        self.web_view.setUrl(QUrl.fromLocalFile(map_path))
+
+    def generate_route(self):
+        """Xử lý khi bấm nút "Bấm""""
+        if not self.current_location:
+            QMessageBox.warning(self, "Cảnh báo", "Vui lòng bấm 'Lấy vị trí hiện tại' trước!")
+            return
+
+        selected_indexes = [item.row() for item in self.list_widget.selectedIndexes()]
+        if not selected_indexes:
+            QMessageBox.warning(self, "Cảnh báo", "Vui lòng chọn ít nhất 1 tập điểm trong danh sách!")
+            return
+
+        # Lấy danh sách điểm được chọn
+        selected_points = self.df.iloc[selected_indexes].to_dict('records')
+        
+        # Lấy điểm đầu tiên được chọn làm điểm đến
+        destination = (selected_points[0]['Latitude'], selected_points[0]['Longitude'])
+        
+        # Tìm đường bằng OSRM
+        route_coords = self.get_osrm_route(self.current_location, destination)
+        
+        # Vẽ lại bản đồ với tuyến đường
+        self.render_map(route_coords=route_coords, selected_points=selected_points)
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = MapApp('QuanLyTĐ.xlsx')
+    window.show()
+    sys.exit(app.exec_())
