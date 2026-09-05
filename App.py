@@ -49,7 +49,6 @@ st.markdown("""
     }
 
     /* ================= TRONG SUỐT KHU VỰC BẢN ĐỒ VÀ PHẦN DƯỚI BẢN ĐỒ ================= */
-    /* Làm trong suốt iframe chứa bản đồ folium và các container xung quanh */
     iframe {
         background-color: transparent !important;
     }
@@ -196,9 +195,9 @@ st.markdown("""
         color: #000000 !important;
     }
 
-    /* MENU TRÊN BẢN ĐỒ (FOLIUM LAYER CONTROL) */
+    /* MENU TRÊN BẢN ĐỒ (FOLIUM LAYER CONTROL) - DỜI XUỐNG DƯỚI BÊN PHẢI */
     .leaflet-control-layers {
-        background: rgba(31, 12, 0, 0.4) !important;
+        background: rgba(31, 12, 0, 0.7) !important;
         backdrop-filter: blur(8px) !important;
         -webkit-backdrop-filter: blur(8px) !important;
         border: 1px solid rgba(0, 240, 255, 0.6) !important;
@@ -208,8 +207,15 @@ st.markdown("""
         font-family: 'Rajdhani', sans-serif !important;
     }
 
+    .leaflet-top.leaflet-right .leaflet-control-layers {
+        position: fixed !important;
+        bottom: 25px !important;
+        right: 15px !important;
+        top: auto !important;
+    }
+
     .leaflet-control-layers-toggle {
-        background-color: rgba(31, 12, 0, 0.6) !important;
+        background-color: rgba(31, 12, 0, 0.8) !important;
         border-radius: 50% !important;
         border: 1px solid #00f0ff !important;
         box-shadow: 0 0 8px rgba(0, 240, 255, 0.5) !important;
@@ -225,6 +231,29 @@ st.markdown("""
         color: #ffffff !important;
         font-weight: 600 !important;
         text-shadow: 0 0 4px rgba(0, 0, 0, 0.8) !important;
+    }
+
+    /* NÚT ZOOM (+/-) - DỜI XUỐNG DƯỚI BÊN TRÁI */
+    .leaflet-top.leaflet-left .leaflet-control-zoom {
+        position: fixed !important;
+        bottom: 25px !important;
+        left: 20px !important;
+        top: auto !important;
+        border: 1px solid #00f0ff !important;
+        box-shadow: 0 0 10px rgba(0, 240, 255, 0.5) !important;
+        border-radius: 6px !important;
+        overflow: hidden;
+    }
+
+    .leaflet-control-zoom a {
+        background-color: #1f0c00 !important;
+        color: #00f0ff !important;
+        border-bottom: 1px solid #ff6600 !important;
+    }
+
+    .leaflet-control-zoom a:hover {
+        background-color: #00f0ff !important;
+        color: #000000 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -448,5 +477,5 @@ if st.session_state.route_coords:
 
 folium.LayerControl().add_to(m)
 
-# Tăng chiều cao lên 100vh để bản đồ kéo dài phủ kín toàn bộ chiều cao màn hình
+# Hiển thị bản đồ với chiều cao full màn hình
 st_folium(m, use_container_width=True, height=1000)
