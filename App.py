@@ -3,7 +3,6 @@ import pandas as pd
 import requests
 import folium
 import streamlit.components.v1 as components
-from streamlit_folium import st_folium
 
 # 1. Cấu hình trang Full-Width
 st.set_page_config(
@@ -13,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Inject CSS Custom
+# 2. Inject CSS Custom UI
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
@@ -201,7 +200,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Hàm nạp dữ liệu
+# 3. Hàm nạp dữ liệu Excel
 @st.cache_data
 def load_data(file_path):
     try:
@@ -284,7 +283,7 @@ if 'ordered_points' not in st.session_state:
 if 'route_summary' not in st.session_state:
     st.session_state.route_summary = None
 
-# Bắt tọa độ Realtime gửi về từ Component JS
+# Bắt tọa độ Realtime từ URL query params
 realtime_lat = st.query_params.get("lat")
 realtime_lon = st.query_params.get("lon")
 if realtime_lat and realtime_lon:
@@ -369,7 +368,7 @@ else:
 
 m = folium.Map(
     location=map_center, 
-    zoom_start=15, 
+    zoom_start=16, 
     tiles=None,
     zoom_control=False
 )
@@ -388,12 +387,34 @@ folium.TileLayer(
     overlay=False
 ).add_to(m)
 
+# 5. HIỂN THỊ MŨI TÊN ĐỊNH HƯỚNG REALTIME QUAY THEO ĐIỆN THOẠI
 if st.session_state.current_loc:
+    # Biểu tượng Mũi Tên Navigation Cyber SVG
+    arrow_icon_html = """
+    <div id="user-heading-arrow" style="
+        width: 42px; 
+        height: 42px; 
+        display: flex; 
+        justify-content: center; 
+        align-items: center; 
+        transition: transform 0.15s ease-out; 
+        transform-origin: center center;
+    ">
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 0px 8px #00f0ff);">
+            <path d="M12 2L4.5 20.29 5.21 21 12 18 18.79 21 19.5 20.29 12 2Z" fill="#00F0FF" stroke="#FFFFFF" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+    </div>
+    """
+    
     folium.Marker(
         location=st.session_state.current_loc,
-        popup="<b>Vị trí GPS Realtime của bạn</b>",
-        tooltip="REALTIME GPS POSITION",
-        icon=folium.Icon(color='red', icon='crosshairs', prefix='fa')
+        popup="<b>Vị trí & Hướng đi của bạn</b>",
+        tooltip="GPS REALTIME HEADING",
+        icon=folium.DivIcon(
+            icon_size=(42, 42),
+            icon_anchor=(21, 21),
+            html=arrow_icon_html
+        )
     ).add_to(m)
 
 if st.session_state.ordered_points:
@@ -451,12 +472,13 @@ map_click_js = folium.Element("""
 """)
 m.get_root().html.add_child(map_click_js)
 
+from streamlit_folium import st_folium
 st_folium(m, use_container_width=True, height=1000)
 
-# LẮNG NGHE TÍN HIỆU CẬP NHẬT TỰ ĐỘNG SIDEBAR & GPS REALTIME TRACKING
+# 6. JAVASCRIPT LẮNG NGHE LA BÀN ĐIỆN THOẠI & GPS REALTIME TRACKING
 components.html("""
 <script>
-    // 1. Thu gọn Sidebar khi chạm vào bản đồ
+    // A. THU GỌN SIDEBAR KHI CHẠM VÀO BẢN ĐỒ
     window.addEventListener('message', function(event) {
         if (event.data && event.data.type === 'CLOSE_STREAMLIT_SIDEBAR') {
             const parentDoc = window.parent.document;
@@ -471,7 +493,41 @@ components.html("""
         }
     });
 
-    // 2. Realtime GPS Tracking qua watchPosition
+    // B. LẤY HƯỚNG XOAY LA BÀN TỪ ĐIỆN THOẠI (COMPASS HEADING)
+    function handleOrientation(event) {
+        let heading = null;
+        if (event.webkitCompassHeading) {
+            // iOS Devices
+            heading = event.webkitCompassHeading;
+        } else if (event.alpha !== null) {
+            // Android Devices
+            heading = 360 - event.alpha;
+        }
+
+        if (heading !== null) {
+            const parentDoc = window.parent.document;
+            const arrowIcons = parentDoc.querySelectorAll('#user-heading-arrow');
+            arrowIcons.forEach(icon => {
+                icon.style.transform = `rotate(${heading}deg)`;
+            });
+        }
+    }
+
+    // Yêu cầu quyền truy cập Cảm biến trên iOS nếu cần
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission()
+            .then(response => {
+                if (response === 'granted') {
+                    window.addEventListener('deviceorientation', handleOrientation, true);
+                }
+            })
+            .catch(console.error);
+    } else {
+        window.addEventListener('deviceorientation absolute', handleOrientation, true);
+        window.addEventListener('deviceorientation', handleOrientation, true);
+    }
+
+    // C. REALTIME GPS TRACKING DI CHUYỂN
     let lastLat = null;
     let lastLon = null;
 
@@ -481,8 +537,7 @@ components.html("""
                 const lat = position.coords.latitude;
                 const lon = position.coords.longitude;
                 
-                // Chỉ cập nhật URL param khi người dùng di chuyển > ~3-5m để tránh reload liên tục
-                if (!lastLat || Math.abs(lat - lastLat) > 0.00005 || Math.abs(lon - lastLon) > 0.00005) {
+                if (!lastLat || Math.abs(lat - lastLat) > 0.00004 || Math.abs(lon - lastLon) > 0.00004) {
                     lastLat = lat;
                     lastLon = lon;
                     
@@ -494,7 +549,7 @@ components.html("""
                 }
             },
             (error) => {
-                console.error("Lỗi lấy tọa độ GPS Realtime:", error);
+                console.error("Lỗi GPS:", error);
             },
             {
                 enableHighAccuracy: true,
