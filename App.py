@@ -5,7 +5,7 @@ import folium
 from streamlit_folium import st_folium
 from streamlit_js_eval import get_geolocation
 
-# 1. Cấu hình trang
+# 1. Cấu hình trang Full-Width
 st.set_page_config(
     page_title="Hệ Thống Tối Ưu Lộ Trình - Robotic UI",
     page_icon="🤖",
@@ -13,14 +13,28 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Inject CSS Custom (Đã fix hoàn toàn khoảng trắng dưới HUD Card)
+# 2. Inject CSS Custom: FULL SCREEN MAP & ROBOTIC THEME
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
 
-    .block-container {
+    /* Ẩn Header mặc định của Streamlit (Thanh Deploy, Menu 3 chấm) */
+    header[data-testid="stHeader"] {
+        display: none !important;
+    }
+
+    /* Triệt tiêu Padding & Margin của Main Content để Bản đồ tràn viền 100% */
+    .main .block-container {
         padding: 0rem !important;
+        margin: 0rem !important;
         max-width: 100% !important;
+    }
+
+    /* Ép khung hiển thị Streamlit Folium tràn kín màn hình */
+    .stFolium, iframe {
+        width: 100% !important;
+        height: 100vh !important;
+        border: none !important;
     }
 
     .stApp {
@@ -31,6 +45,7 @@ st.markdown("""
         color: #ffffff !important;
     }
 
+    /* Sidebar Styling */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #331400 0%, #1f0c00 100%) !important;
         border-right: 2px solid #ff6600 !important;
@@ -69,7 +84,6 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    /* ĐÃ XÓA MARGIN DƯ THỪA ĐỂ LOẠI BỎ KHỎANG TRẮNG DƯỚI RADA */
     .hud-card {
         background: rgba(51, 20, 0, 0.85) !important;
         border: 1px solid #ff6600 !important;
@@ -95,7 +109,6 @@ st.markdown("""
         font-family: 'Orbitron', sans-serif;
     }
 
-    /* Ép sát các khoảng trắng do Streamlit Element tạo ra */
     [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div {
         gap: 0.5rem !important;
     }
@@ -146,7 +159,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# (Các hàm xử lý dữ liệu & thuật toán giữ nguyên)
+# 3. Nạp dữ liệu
 @st.cache_data
 def load_data(file_path):
     try:
@@ -156,6 +169,7 @@ def load_data(file_path):
     except Exception:
         return pd.DataFrame()
 
+# 4. Thuật toán lộ trình vòng kín (Round-Trip)
 def get_optimized_route_roundtrip(origin, points_list):
     all_points = [{'Name': 'GPS ORIGIN', 'Latitude': origin[0], 'Longitude': origin[1]}] + points_list
     coords_str = ";".join([f"{pt['Longitude']},{pt['Latitude']}" for pt in all_points])
@@ -224,7 +238,7 @@ if 'ordered_points' not in st.session_state:
 if 'route_summary' not in st.session_state:
     st.session_state.route_summary = None
 
-# ================= SIDEBAR (TỐI ƯU KHOẢNG CÁCH GIAO DIỆN) =================
+# ================= SIDEBAR =================
 with st.sidebar:
     st.markdown("<h2 class='robot-title'>🤖 Make By BangNC13</h2>", unsafe_allow_html=True)
     
@@ -254,7 +268,6 @@ with st.sidebar:
     else:
         st.info("Bật GPS thiết bị để xác định điểm gốc.")
 
-    # Đã bỏ st.divider() thừa ở đây để nối thẳng nút bấm vào khung rada
     if st.button("⚡ Bấm xem lộ trình ⚡", use_container_width=True):
         if not st.session_state.current_loc:
             st.error("Chưa có tín hiệu GPS!")
@@ -294,7 +307,7 @@ with st.sidebar:
             st.markdown(f"<span style='color:#00f0ff;'>[{pt['Order']}]</span> <span style='color:#ffffff;'>{pt['Name']}</span>", unsafe_allow_html=True)
         st.markdown(f"<span style='color:#00f0ff;'>[{len(st.session_state.ordered_points)+1}]</span> <span style='color:#ffffff;'>Quay về vị trí xuất phát</span>", unsafe_allow_html=True)
 
-# ================= MAIN CONTENT MAP =================
+# ================= MAIN CONTENT MAP (FULL SCREEN) =================
 if st.session_state.current_loc:
     map_center = st.session_state.current_loc
 else:
@@ -358,4 +371,6 @@ if st.session_state.route_coords:
     ).add_to(m)
 
 folium.LayerControl().add_to(m)
-st_folium(m, width="100%", height=900)
+
+# Hiển thị Map tràn toàn bộ chiều rộng và chiều cao
+st_folium(m, width="100%", height=None, use_container_width=True)
