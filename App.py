@@ -23,6 +23,40 @@ st.markdown("""
     .stApp { background-color: #1a0a00 !important; }
     html, body, .stMarkdown, p, label { color: #ffffff !important; }
 
+    /* Custom nút ẩn/hiện menu sidebar màu Xanh Neon & Bo tròn */
+    [data-testid="stSidebarCollapseButton"],
+    [data-testid="stSidebarExpandButton"] button,
+    button[data-testid="baseButton-headerNoPadding"] {
+        background-color: #1a0a00 !important;
+        border: 2px solid #00f0ff !important;
+        border-radius: 50% !important;
+        color: #00f0ff !important;
+        box-shadow: 0 0 10px rgba(0, 240, 255, 0.6) !important;
+        transition: all 0.3s ease-in-out !important;
+        width: 40px !important;
+        height: 40px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    [data-testid="stSidebarCollapseButton"]:hover,
+    [data-testid="stSidebarExpandButton"] button:hover,
+    button[data-testid="baseButton-headerNoPadding"]:hover {
+        background-color: #00f0ff !important;
+        color: #000000 !important;
+        box-shadow: 0 0 20px rgba(0, 240, 255, 1) !important;
+        transform: scale(1.1) !important;
+    }
+
+    /* Đổi màu icon bên trong nút menu sang Xanh Neon */
+    [data-testid="stSidebarCollapseButton"] svg,
+    [data-testid="stSidebarExpandButton"] svg,
+    button[data-testid="baseButton-headerNoPadding"] svg {
+        fill: #00f0ff !important;
+        color: #00f0ff !important;
+    }
+
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #331400 0%, #1f0c00 100%) !important;
         border-right: 2px solid #ff6600 !important;
@@ -315,7 +349,7 @@ if st.session_state.route_coords:
 
 folium.LayerControl().add_to(m)
 
-# INJECT JAVASCRIPT & CSS DẠNG GOOGLE MAPS BLUE DOT WITH PULSE
+# INJECT JAVASCRIPT & CSS REALTIME MARKER VÀ NÚT TỌA ĐỘ GPS
 js_realtime_tracker = """
 <script>
     setTimeout(function() {
@@ -323,7 +357,7 @@ js_realtime_tracker = """
         if (!map_element) return;
         var map = map_element._leaflet_map;
         
-        // Tạo Icon chuẩn Google Maps với CSS Ripple Pulsing
+        // 1. Tạo Icon Marker chuẩn Google Maps Blue Dot
         var googleDotIcon = L.divIcon({
             className: 'gmaps-marker',
             html: '<div class="gmaps-pulse"></div><div class="gmaps-dot"></div>',
@@ -332,27 +366,72 @@ js_realtime_tracker = """
         });
 
         var userMarker = null;
+        var currentLatLng = null;
 
+        // 2. Hàm định vị vị trí người dùng
+        function updateLocation(centerMap) {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    var lat = position.coords.latitude;
+                    var lng = position.coords.longitude;
+                    currentLatLng = new L.LatLng(lat, lng);
+
+                    if (!userMarker) {
+                        userMarker = L.marker(currentLatLng, {icon: googleDotIcon, zIndexOffset: 1000}).addTo(map);
+                        userMarker.bindTooltip("Vị trí của bạn (Realtime)", {permanent: false, direction: 'top'});
+                    } else {
+                        userMarker.setLatLng(currentLatLng);
+                    }
+
+                    if (centerMap) {
+                        map.flyTo(currentLatLng, 16, { animate: true, duration: 1.5 });
+                    }
+                }, function(error) {
+                    console.error("Lỗi GPS: ", error);
+                }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 });
+            }
+        }
+
+        // Tự động lấy vị trí ban đầu
+        updateLocation(false);
+
+        // Theo dõi di chuyển liên tục
         if ("geolocation" in navigator) {
             navigator.geolocation.watchPosition(function(position) {
                 var lat = position.coords.latitude;
                 var lng = position.coords.longitude;
-                var newLatLng = new L.LatLng(lat, lng);
+                currentLatLng = new L.LatLng(lat, lng);
 
                 if (!userMarker) {
-                    userMarker = L.marker(newLatLng, {icon: googleDotIcon, zIndexOffset: 1000}).addTo(map);
+                    userMarker = L.marker(currentLatLng, {icon: googleDotIcon, zIndexOffset: 1000}).addTo(map);
                     userMarker.bindTooltip("Vị trí của bạn (Realtime)", {permanent: false, direction: 'top'});
                 } else {
-                    userMarker.setLatLng(newLatLng);
+                    userMarker.setLatLng(currentLatLng);
                 }
-            }, function(error) {
-                console.error("GPS Error: ", error);
-            }, {
-                enableHighAccuracy: true,
-                maximumAge: 1000,
-                timeout: 5000
-            });
+            }, null, { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 });
         }
+
+        # 3. Tạo nút bấm biểu tượng Tọa độ (GPS Control)
+        var gpsControl = L.control({position: 'topright'});
+        gpsControl.onAdd = function (map) {
+            var div = L.DomUtil.create('div', 'leaflet-bar leaflet-control custom-gps-btn');
+            div.innerHTML = '<button title="Định vị vị trí hiện tại" style="background-color: #1a0a00; border: 2px solid #00f0ff; border-radius: 50%; width: 44px; height: 44px; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 0 15px rgba(0,240,255,0.6); transition: all 0.3s ease;">' +
+                            '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00f0ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+                            '<crosshair x1="12" y1="2" x2="12" y2="6"></crosshair>' +
+                            '<circle cx="12" cy="12" r="7"></circle>' +
+                            '<line x1="12" y1="2" x2="12" y2="5"></line>' +
+                            '<line x1="12" y1="19" x2="12" y2="22"></line>' +
+                            '<line x1="2" y1="12" x2="5" y2="12"></line>' +
+                            '<line x1="19" y1="12" x2="22" y2="12"></line>' +
+                            '</svg></button>';
+            
+            div.onclick = function() {
+                updateLocation(true);
+            };
+            return div;
+        };
+        gpsControl.addTo(map);
+
     }, 1000);
 </script>
 
@@ -401,6 +480,16 @@ js_realtime_tracker = """
         height: 50px;
         opacity: 0;
     }
+}
+
+.custom-gps-btn button:hover {
+    background-color: #00f0ff !important;
+    transform: scale(1.1);
+    box-shadow: 0 0 25px rgba(0, 240, 255, 1) !important;
+}
+
+.custom-gps-btn button:hover svg {
+    stroke: #000000 !important;
 }
 </style>
 """
