@@ -13,14 +13,28 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Inject CSS Custom
+# 2. Inject CSS Custom: Clean White Lines, Full Screen Map & Robotic Theme
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
 
-    .block-container {
+    /* Ẩn Header mặc định của Streamlit */
+    header[data-testid="stHeader"] {
+        display: none !important;
+    }
+
+    /* Triệt tiêu Padding & Margin của Main Content */
+    .main .block-container {
         padding: 0rem !important;
+        margin: 0rem !important;
         max-width: 100% !important;
+    }
+
+    /* Ép khung hiển thị Streamlit Folium tràn kín màn hình */
+    .stFolium, iframe {
+        width: 100% !important;
+        height: 100vh !important;
+        border: none !important;
     }
 
     .stApp {
@@ -31,6 +45,7 @@ st.markdown("""
         color: #ffffff !important;
     }
 
+    /* Sidebar Styling */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #331400 0%, #1f0c00 100%) !important;
         border-right: 2px solid #ff6600 !important;
@@ -45,7 +60,7 @@ st.markdown("""
         letter-spacing: 2px;
         text-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
         margin-top: 15px;
-        margin-bottom: 20px;
+        margin-bottom: 15px;
     }
 
     div.stButton > button {
@@ -74,8 +89,9 @@ st.markdown("""
         border: 1px solid #ff6600 !important;
         border-left: 4px solid #00f0ff !important;
         border-radius: 6px;
-        padding: 12px;
-        margin-top: 10px;
+        padding: 10px 12px;
+        margin-top: 5px !important;
+        margin-bottom: 0px !important;
         box-shadow: inset 0 0 10px rgba(255, 102, 0, 0.2);
         font-family: 'Rajdhani', sans-serif;
     }
@@ -88,14 +104,18 @@ st.markdown("""
 
     .hud-value {
         color: #00f0ff !important;
-        font-size: 1.3rem;
+        font-size: 1.2rem;
         font-weight: bold;
         font-family: 'Orbitron', sans-serif;
     }
 
+    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div {
+        gap: 0.5rem !important;
+    }
+
+    /* Triệt tiêu đường vạch kẻ trắng st.divider */
     hr {
-        border-color: #ff6600 !important;
-        opacity: 0.5;
+        display: none !important;
     }
 
     /* MULTISELECT UI FIX */
@@ -137,21 +157,19 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Hàm nạp dữ liệu
+# 3. Nạp dữ liệu
 @st.cache_data
 def load_data(file_path):
     try:
         df = pd.read_excel(file_path)
         df = df.dropna(subset=['Latitude', 'Longitude'])
         return df
-    except Exception as e:
+    except Exception:
         return pd.DataFrame()
 
-# 4. THUẬT TOÁN TỐI ƯU LỘ TRÌNH MỚI (NEAREST NEIGHBOR VIA OSRM TABLE API)
-def get_optimized_route_v2(origin, points_list):
+# 4. Thuật toán tối ưu hóa lộ trình vòng kín (Nearest Neighbor qua OSRM Table)
+def get_optimized_route_roundtrip(origin, points_list):
     all_points = [{'Name': 'GPS ORIGIN', 'Latitude': origin[0], 'Longitude': origin[1]}] + points_list
-    
-    # Tạo chuỗi tọa độ cho OSRM Table API
     coords_str = ";".join([f"{pt['Longitude']},{pt['Latitude']}" for pt in all_points])
     table_url = f"http://router.project-osrm.org/table/v1/driving/{coords_str}?annotations=duration,distance"
     
@@ -160,9 +178,7 @@ def get_optimized_route_v2(origin, points_list):
         if res.get('code') != 'Ok':
             return None, [], 0, 0
             
-        durations = res['durations'] # Ma trận thời gian giữa các điểm
-        
-        # Thuật toán Nearest Neighbor tìm chuỗi thứ tự chuẩn
+        durations = res['durations']
         unvisited = list(range(1, len(all_points)))
         current_idx = 0
         ordered_indices = []
@@ -173,7 +189,6 @@ def get_optimized_route_v2(origin, points_list):
             unvisited.remove(next_idx)
             current_idx = next_idx
 
-        # Tạo danh sách điểm đã sắp xếp theo thứ tự tối ưu thực tế
         ordered_points = []
         route_coords_str = f"{origin[1]},{origin[0]}"
         
@@ -187,7 +202,9 @@ def get_optimized_route_v2(origin, points_list):
             })
             route_coords_str += f";{pt['Longitude']},{pt['Latitude']}"
 
-        # Lấy hình tuyến đường chi tiết (Polyline) từ OSRM Route API
+        # Thêm điểm xuất phát vào cuối để tạo vòng kín (ĐIỂM ĐẾN = ĐIỂM BẮT ĐẦU)
+        route_coords_str += f";{origin[1]},{origin[0]}"
+
         route_url = f"http://router.project-osrm.org/route/v1/driving/{route_coords_str}?overview=full&geometries=geojson"
         route_res = requests.get(route_url, timeout=10).json()
         
@@ -222,7 +239,7 @@ if 'ordered_points' not in st.session_state:
 if 'route_summary' not in st.session_state:
     st.session_state.route_summary = None
 
-# ================= SIDEBAR =================
+# ================= SIDEBAR (GIAO DIỆN KHÔNG VẠCH TRẮNG) =================
 with st.sidebar:
     st.markdown("<h2 class='robot-title'>🤖 Make By BangNC13</h2>", unsafe_allow_html=True)
     
@@ -234,9 +251,7 @@ with st.sidebar:
         placeholder="Choose options"
     )
     
-    st.divider()
-    
-    st.markdown("<div class='hud-label'>📡 Trạng thái định vị GPS:</div>", unsafe_allow_html=True)
+    st.markdown("<div class='hud-label' style='margin-top: 15px;'>📡 TRẠNG THÁI ĐỊNH VỊ GPS:</div>", unsafe_allow_html=True)
     loc_data = get_geolocation()
     
     if loc_data and 'coords' in loc_data:
@@ -252,7 +267,7 @@ with st.sidebar:
     else:
         st.info("Bật GPS thiết bị để xác định điểm gốc.")
 
-    st.divider()
+    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
     if st.button("⚡ Bấm xem lộ trình ⚡", use_container_width=True):
         if not st.session_state.current_loc:
@@ -263,8 +278,8 @@ with st.sidebar:
             selected_df = df[df['Tên đối tượng'].isin(selected_names)]
             points_list = selected_df.to_dict('records')
             
-            with st.spinner("🤖 Đang tính toán ma trận ma quỷ & tối ưu hóa..."):
-                route_coords, ordered_points, dist_km, dur_min = get_optimized_route_v2(
+            with st.spinner("🤖 Đang tối ưu hóa lộ trình vòng kín..."):
+                route_coords, ordered_points, dist_km, dur_min = get_optimized_route_roundtrip(
                     st.session_state.current_loc, points_list
                 )
                 
@@ -277,21 +292,23 @@ with st.sidebar:
                     }
 
     if st.session_state.route_summary:
-        st.divider()
+        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
         st.markdown(f"""
         <div class='hud-card'>
-            <div class='hud-label'>Tổng quãng đường</div>
+            <div class='hud-label'>Tổng quãng đường (Vòng kín)</div>
             <div class='hud-value'>{st.session_state.route_summary['distance']:.2f} KM</div>
-            <div class='hud-label' style='margin-top:8px;'>Thời gian di chuyển</div>
+            <div class='hud-label' style='margin-top:6px;'>Thời gian di chuyển</div>
             <div class='hud-value'>{st.session_state.route_summary['duration']:.0f} PHÚT</div>
         </div>
         """, unsafe_allow_html=True)
         
-        st.markdown("<br><b style='color:#ffffff;'>📍 Lộ trình thực thi:</b>", unsafe_allow_html=True)
+        st.markdown("<b style='color:#ffffff; display:block; margin-top:10px;'>📍 Lộ trình thực thi:</b>", unsafe_allow_html=True)
+        st.markdown("<span style='color:#00f0ff;'>[0] Vị trí xuất phát (GPS CORE)</span>", unsafe_allow_html=True)
         for pt in st.session_state.ordered_points:
             st.markdown(f"<span style='color:#00f0ff;'>[{pt['Order']}]</span> <span style='color:#ffffff;'>{pt['Name']}</span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='color:#00f0ff;'>[{len(st.session_state.ordered_points)+1}]</span> <span style='color:#ffffff;'>Quay về vị trí xuất phát</span>", unsafe_allow_html=True)
 
-# ================= MAIN CONTENT MAP =================
+# ================= MAIN CONTENT MAP (FULL SCREEN) =================
 if st.session_state.current_loc:
     map_center = st.session_state.current_loc
 else:
@@ -316,8 +333,8 @@ folium.TileLayer(
 if st.session_state.current_loc:
     folium.Marker(
         location=st.session_state.current_loc,
-        popup="<b>Vị trí xuất phát</b>",
-        tooltip="GPS ORIGIN",
+        popup="<b>Vị trí xuất phát & Kết thúc (GPS CORE)</b>",
+        tooltip="GPS ORIGIN & END",
         icon=folium.Icon(color='red', icon='crosshairs', prefix='fa')
     ).add_to(m)
 
@@ -351,8 +368,10 @@ if st.session_state.route_coords:
         color="#00F0FF",
         weight=5,
         opacity=0.9,
-        tooltip="Cyber Route Trajectory"
+        tooltip="Cyber Round-Trip Route"
     ).add_to(m)
 
 folium.LayerControl().add_to(m)
-st_folium(m, width="100%", height=900)
+
+# Hiển thị Bản đồ tràn toàn bộ màn hình
+st_folium(m, width="100%", height=None, use_container_width=True)
