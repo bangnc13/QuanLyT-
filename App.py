@@ -7,18 +7,38 @@ from folium.plugins import LocateControl
 from scipy.spatial.distance import cdist
 import urllib.parse
 
-# 1. Cấu hình trang full màn hình
-st.set_page_config(layout="wide", page_title="Quản lý Tọa độ & Chỉ đường Google Maps", initial_sidebar_state="collapsed")
+# 1. Cấu hình giao diện tràn màn hình & Phong cách Robotic / Cyberpunk Dark Mode
+st.set_page_config(layout="wide", page_title="Robotic Route HUD", initial_sidebar_state="collapsed")
 
-# CSS tùy chỉnh để tối ưu hóa không gian hiển thị tràn viền
 st.markdown("""
     <style>
-        .block-container { padding-top: 1rem; padding-bottom: 0rem; padding-left: 1rem; padding-right: 1rem; }
-        div[data-testid="stSidebarCollapseButton"] { background-color: #1a73e8; color: white; }
+        /* Dark Theme & Robotic Style */
+        .stApp {
+            background-color: #0d1117;
+            color: #58a6ff;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .block-container {
+            padding: 0.5rem 0.5rem 0rem 0.5rem !important;
+        }
+        /* Hide Sidebar Collapse Button & Header elements */
+        header {visibility: hidden;}
+        div[data-testid="stSidebar"] {display: none;}
+        
+        /* Custom HUD Overlay Styling for Map */
+        .leaflet-control-hud {
+            background: rgba(13, 17, 23, 0.85);
+            border: 1px solid #30363d;
+            box-shadow: 0 0 10px rgba(56, 139, 253, 0.3);
+            border-radius: 6px;
+            padding: 10px 14px;
+            color: #58a6ff;
+            font-family: 'Courier New', Courier, monospace;
+        }
     </style>
 """, unsafe_allow_html=True)
 
-# 2. Nạp và xử lý dữ liệu từ file Excel
+# 2. Nạp dữ liệu Excel
 @st.cache_data
 def load_data():
     df = pd.read_excel('QuanLyTĐ.xlsx', sheet_name='TĐ')
@@ -28,10 +48,10 @@ def load_data():
 try:
     df = load_data()
 except Exception as e:
-    st.error(f"Không thể đọc file QuanLyTĐ.xlsx. Lỗi: {e}")
+    st.error(f"[SYSTEM ERROR]: Không thể nạp dữ liệu. Chi tiết: {e}")
     st.stop()
 
-# 3. Tính khoảng cách địa lý (Haversine - km)
+# 3. Thuật toán Haversine & TSP
 def haversine_matrix(coords):
     rads = np.radians(coords)
     lats, lons = rads[:, 0], rads[:, 1]
@@ -40,7 +60,6 @@ def haversine_matrix(coords):
     a = np.sin(dlat / 2.0)**2 + np.cos(lats[:, None]) * np.cos(lats[None, :]) * np.sin(dlon / 2.0)**2
     return 6371 * 2 * np.arcsin(np.sqrt(a))
 
-# 4. Thuật toán tối ưu hóa tuyến đường (TSP)
 def solve_tsp(selected_df):
     coords = selected_df[['Latitude', 'Longitude']].values
     dist_mat = haversine_matrix(coords)
@@ -61,27 +80,15 @@ def solve_tsp(selected_df):
         
     return path, total_dist
 
-# 5. Sidebar điều hướng
-st.sidebar.title("⚙️ Thống kê & Cấu hình")
-all_objects = df['Tên đối tượng'].tolist()
+# Mặc định tự động chọn 10 điểm đầu tiên để dựng lộ trình
+default_points = df['Tên đối tượng'].head(10).tolist()
+selected_df = df[df['Tên đối tượng'].isin(default_points)].reset_index(drop=True)
 
-selected_names = st.sidebar.multiselect(
-    "Chọn danh sách đối tượng (khoảng 10 điểm):",
-    options=all_objects,
-    default=all_objects[:10] if len(all_objects) >= 10 else all_objects[:2]
-)
-
-if len(selected_names) < 2:
-    st.warning("Vui lòng chọn ít nhất 2 đối tượng từ Sidebar bên trái.")
-else:
-    selected_df = df[df['Tên đối tượng'].isin(selected_names)].reset_index(drop=True)
+if len(selected_df) >= 2:
     path_indices, total_km = solve_tsp(selected_df)
     ordered_df = selected_df.iloc[path_indices].reset_index(drop=True)
 
-    # Hiển thị thông số trên Sidebar
-    st.sidebar.metric(label="Tổng chiều dài lộ trình", value=f"{total_km:.2f} km")
-    
-    # URL Google Maps lộ trình tổng
+    # 4. Tạo URL Google Maps lộ trình tổng
     origin = f"{ordered_df.iloc[0]['Latitude']},{ordered_df.iloc[0]['Longitude']}"
     destination = f"{ordered_df.iloc[-1]['Latitude']},{ordered_df.iloc[-1]['Longitude']}"
     waypoints = "|".join([f"{row['Latitude']},{row['Longitude']}" for _, row in ordered_df.iloc[1:-1].iterrows()])
@@ -89,103 +96,127 @@ else:
     if waypoints:
         gmaps_full_route_url += f"&waypoints={urllib.parse.quote(waypoints)}"
 
-    st.sidebar.link_button(
-        "🚀 Mở lộ trình trên Google Maps App", 
-        gmaps_full_route_url, 
-        type="primary",
-        use_container_width=True
-    )
-
-    st.sidebar.subheader("Thứ tự di chuyển")
-    for idx, row in ordered_df.iterrows():
-        seq_num = idx + 1
-        point_url = f"https://www.google.com/maps/dir/?api=1&destination={row['Latitude']},{row['Longitude']}"
-        st.sidebar.markdown(f"**{seq_num}. {row['Tên đối tượng']}**  \n[🧭 Chỉ đường Google Maps]({point_url})")
-
-    # 6. Khu vực Bản đồ Full màn hình
+    # 5. Khởi tạo Bản đồ Google Maps giao diện Vệ tinh / Đêm
     center_lat = ordered_df['Latitude'].mean()
     center_lon = ordered_df['Longitude'].mean()
 
-    # Khởi tạo bản đồ với Google Maps làm nền mặc định
     m = folium.Map(
         location=[center_lat, center_lon], 
         zoom_start=13,
-        tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
-        attr="Google Maps"
+        tiles="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+        attr="Google Maps Hybrid"
     )
 
-    # Thêm lớp bản đồ Vệ tinh & Hybrid
-    folium.TileLayer(
-        tiles="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
-        attr="Google Maps Hybrid",
-        name="Google Vệ tinh"
-    ).add_to(m)
-
-    # Nút Định vị GPS thiết bị đẹp mắt
+    # Nút Định vị GPS thiết bị kiểu HUD Cyberpunk
     LocateControl(
         auto_start=False,
         flyTo=True,
         keepCurrentZoomLevel=True,
-        strings={"title": "Vị trí GPS của bạn"},
-        icon="fa-location-arrow",
-        icon_element='<span class="fa fa-location-arrow" style="color: #1a73e8; font-size: 16px;"></span>'
+        strings={"title": "TARGET GPS LOCK"},
+        icon="fa-crosshairs",
+        icon_element='<span class="fa fa-crosshairs" style="color: #00ffcc; font-size: 18px;"></span>'
     ).add_to(m)
 
-    # Tính năng chỉ đường giao thông trực tiếp trên Map (Routing Machine)
-    routing_script = """
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
-    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
-    """
-    m.get_root().header.add_child(folium.Element(routing_script))
+    # 6. Tạo Bảng điều khiển HUD trực tiếp trên Bản đồ (On-Screen Map Overlay)
+    hud_html = f'''
+    <div style="
+        position: fixed; 
+        top: 15px; 
+        left: 60px; 
+        z-index: 9999; 
+        background: rgba(13, 17, 23, 0.9);
+        border: 1px solid #30363d;
+        border-left: 4px solid #00ffcc;
+        box-shadow: 0 0 15px rgba(0, 255, 204, 0.2);
+        border-radius: 4px;
+        padding: 10px 15px;
+        color: #e6edf3;
+        font-family: monospace;
+    ">
+        <div style="font-size: 11px; color: #8b949e; letter-spacing: 1px;">SYS.ROUTE_NAV // ACTIVE</div>
+        <div style="font-size: 18px; font-weight: bold; color: #00ffcc; margin: 2px 0 8px 0;">
+            DIST: {total_km:.2f} KM <span style="font-size:12px; color:#8b949e;">({len(ordered_df)} NODES)</span>
+        </div>
+        <a href="{gmaps_full_route_url}" target="_blank" style="
+            display: inline-block;
+            background: linear-gradient(90deg, #1f6beb, #238636);
+            color: #ffffff;
+            padding: 6px 12px;
+            text-decoration: none;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            box-shadow: 0 0 8px rgba(35, 134, 54, 0.4);
+        ">
+            ⚡ OPEN FULL ROUTE (GMAPS)
+        </a>
+    </div>
+    '''
+    m.get_root().html.add_child(folium.Element(hud_html))
 
-    # Bảng điều khiển chuyển đổi lớp bản đồ
-    folium.LayerControl().add_to(m)
-
-    # Vẽ đường thẳng kết nối lộ trình
+    # 7. Vẽ đường nối Laser Neon giữa các mốc điểm
     route_coords = ordered_df[['Latitude', 'Longitude']].values.tolist()
-    folium.PolyLine(route_coords, color="#1A73E8", weight=5, opacity=0.8, dash_array='8, 8').add_to(m)
+    folium.PolyLine(
+        route_coords, 
+        color="#00ffcc", 
+        weight=4, 
+        opacity=0.9, 
+        dash_array='6, 6'
+    ).add_to(m)
 
-    # Tạo Marker các mốc điểm
+    # 8. Đánh dấu điểm mốc kiểu Robotic HUD
     for idx, row in ordered_df.iterrows():
         seq_num = idx + 1
         direct_gmaps_url = f"https://www.google.com/maps/dir/?api=1&destination={row['Latitude']},{row['Longitude']}"
         
         popup_html = f"""
-        <div style="font-family: Arial; min-width: 180px;">
-            <h4 style="margin: 0 0 5px 0; color: #1a73e8;">{seq_num}. {row['Tên đối tượng']}</h4>
-            <p style="margin: 0 0 8px 0; font-size: 12px; color: #555;">
-               <b>Tọa độ:</b> {row['Latitude']:.5f}, {row['Longitude']:.5f}
-            </p>
-            <a href="{direct_gmaps_url}" target="_blank" 
-               style="
-                   display: block;
-                   text-align: center;
-                   background-color: #1a73e8;
-                   color: white;
-                   padding: 6px 10px;
-                   text-decoration: none;
-                   border-radius: 4px;
-                   font-size: 12px;
-                   font-weight: bold;
-               ">
-               🧭 Chỉ đường bằng App Google Maps
+        <div style="
+            font-family: monospace; 
+            background-color: #0d1117; 
+            color: #c9d1d9; 
+            padding: 10px; 
+            border-radius: 4px;
+            border: 1px solid #30363d;
+            min-width: 180px;
+        ">
+            <div style="font-size: 10px; color: #8b949e;">NODE #{seq_num:02d}</div>
+            <div style="font-size: 14px; font-weight: bold; color: #58a6ff; margin-bottom: 5px;">
+                {row['Tên đối tượng']}
+            </div>
+            <div style="font-size: 11px; color: #8b949e; margin-bottom: 10px;">
+                LAT: {row['Latitude']:.5f}<br>LON: {row['Longitude']:.5f}
+            </div>
+            <a href="{direct_gmaps_url}" target="_blank" style="
+                display: block;
+                text-align: center;
+                background-color: #238636;
+                color: #ffffff;
+                padding: 6px 8px;
+                text-decoration: none;
+                border-radius: 3px;
+                font-size: 11px;
+                font-weight: bold;
+            ">
+                🧭 NAVIGATE TO NODE
             </a>
         </div>
         """
         
         marker_icon_html = f'''
             <div style="
+                font-family: monospace;
                 font-size: 11pt; 
-                color: white; 
-                background-color: #EA4335; 
-                border: 2px solid white;
-                border-radius: 50%; 
-                width: 28px; 
-                height: 28px; 
+                color: #0d1117; 
+                background-color: #00ffcc; 
+                border: 2px solid #ffffff;
+                border-radius: 3px; 
+                width: 26px; 
+                height: 26px; 
                 text-align: center; 
-                line-height: 24px; 
+                line-height: 22px; 
                 font-weight: bold;
-                box-shadow: 2px 2px 5px rgba(0,0,0,0.4);">
+                box-shadow: 0 0 10px rgba(0, 255, 204, 0.8);">
                 {seq_num}
             </div>
         '''
@@ -193,9 +224,9 @@ else:
         folium.Marker(
             location=[row['Latitude'], row['Longitude']],
             popup=folium.Popup(popup_html, max_width=300),
-            tooltip=f"{seq_num}. {row['Tên đối tượng']}",
+            tooltip=f"NODE #{seq_num:02d}: {row['Tên đối tượng']}",
             icon=folium.DivIcon(html=marker_icon_html)
         ).add_to(m)
 
-    # Hiển thị Map full màn hình
-    st_folium(m, width="100%", height=780, returned_objects=[])
+    # Hiển thị bản đồ tràn màn hình
+    st_folium(m, width="100%", height=850, returned_objects=[])
