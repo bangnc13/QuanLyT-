@@ -426,29 +426,46 @@ if st.session_state.route_coords:
         tooltip="Cyber Round-Trip Route"
     ).add_to(m)
 
+# TỰ ĐỘNG BẮT SỰ KIỆN CLICK TRÊN BẢN ĐỒ VÀ BÁO VỀ TRÌNH DUYỆT MẸ ĐỂ THU GỌN SIDEBAR
+map_click_js = folium.Element("""
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var mapContainer = document.querySelector('.folium-map');
+        if (mapContainer) {
+            mapContainer.addEventListener('click', function() {
+                try {
+                    window.parent.postMessage({type: 'CLOSE_STREAMLIT_SIDEBAR'}, '*');
+                } catch(e) {}
+            });
+            mapContainer.addEventListener('touchstart', function() {
+                try {
+                    window.parent.postMessage({type: 'CLOSE_STREAMLIT_SIDEBAR'}, '*');
+                } catch(e) {}
+            });
+        }
+    });
+</script>
+""")
+m.get_root().html.add_child(map_click_js)
+
 st_folium(m, use_container_width=True, height=1000)
 
-# TỰ ĐỘNG ẨN SIDEBAR KHI CHẠM/CLICK VÀO BẢN ĐỒ
+# LẮNG NGHE TÍN HIỆU TỪ MAP VÀ KÍCH HOẠT NÚT COLLAPSE SIDEBAR
 components.html("""
 <script>
-    const parentDoc = window.parent.document;
-    
-    function attachMapClickListener() {
-        const iframes = parentDoc.querySelectorAll('iframe');
-        iframes.forEach(iframe => {
-            try {
-                iframe.contentWindow.document.addEventListener('click', function() {
-                    const collapseBtn = parentDoc.querySelector('[data-testid="stSidebarCollapseButton"] button');
-                    if (collapseBtn) {
-                        collapseBtn.click();
-                    }
-                });
-            } catch (e) {
-                // Bỏ qua lỗi cross-origin đối với iframe bên thứ ba
+    window.addEventListener('message', function(event) {
+        if (event.data && event.data.type === 'CLOSE_STREAMLIT_SIDEBAR') {
+            const parentDoc = window.parent.document;
+            const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
+            
+            // Kiểm tra xem Sidebar có đang mở không
+            if (sidebar && sidebar.getAttribute('aria-expanded') === 'true') {
+                const collapseBtn = parentDoc.querySelector('[data-testid="stSidebarCollapseButton"] button');
+                if (collapseBtn) {
+                    collapseBtn.click();
+                }
             }
-        });
-    }
-
-    setTimeout(attachMapClickListener, 1500);
+        }
+    });
 </script>
 """, height=0, width=0)
