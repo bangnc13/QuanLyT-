@@ -2,7 +2,6 @@ import os
 import json
 import math
 import pandas as pd
-import networkx as nx
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -13,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS Tùy chỉnh Dark Theme
+# CSS Dark Theme cho ứng dụng & Sidebar
 st.markdown("""
     <style>
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
@@ -25,7 +24,6 @@ st.markdown("""
             color: #E2E8F0 !important;
         }
 
-        /* Sidebar Dark Mode */
         section[data-testid="stSidebar"] {
             background-color: #1E293B !important;
             z-index: 999999 !important;
@@ -88,10 +86,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Khởi tạo session state
-if "break_result" not in st.session_state:
-    st.session_state.break_result = None
-if "break_gps" not in st.session_state:
-    st.session_state.break_gps = None
 if "selected_pops" not in st.session_state:
     st.session_state.selected_pops = []
 if "user_gps" not in st.session_state:
@@ -99,7 +93,7 @@ if "user_gps" not in st.session_state:
 if "calculated_route" not in st.session_state:
     st.session_state.calculated_route = []
 
-# Đọc tọa độ GPS từ URL
+# Nhận tọa độ GPS từ URL trình duyệt
 query_params = st.query_params
 if "user_lat" in query_params and "user_lon" in query_params:
     try:
@@ -107,6 +101,7 @@ if "user_lat" in query_params and "user_lon" in query_params:
     except Exception:
         pass
 
+# Tính khoảng cách Haversine (km)
 def haversine(coord1, coord2):
     R = 6371.0
     lat1, lon1 = math.radians(coord1[0]), math.radians(coord1[1])
@@ -117,6 +112,7 @@ def haversine(coord1, coord2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
+# Thuật toán Nearest Neighbor tìm đường đi ngắn nhất
 def calculate_optimal_route(start_gps, target_points):
     if not target_points:
         return []
@@ -133,157 +129,91 @@ def calculate_optimal_route(start_gps, target_points):
 
     return route
 
-# Tải file mặc định từ Server nếu có
-def load_server_data():
-    possible_files = [
-        "Danh-Sách-Đoạn-Cáp.xlsx", 
-        "Danh_Sach_Doan_Cap.xlsx", 
-        "data.xlsx", 
-        "Danh-Sách-Đoạn-Cáp.xls"
-    ]
-    for f in possible_files:
-        if os.path.exists(f):
-            return pd.read_excel(f)
-    files = [f for f in os.listdir(".") if f.endswith(".xlsx") or f.endswith(".xls")]
-    if files:
-        return pd.read_excel(files[0])
+# Đọc file Excel đính kèm QuanLyTĐ.xlsx
+@st.cache_data
+def load_local_data():
+    file_path = "QuanLyTĐ.xlsx"
+    if os.path.exists(file_path):
+        df = pd.read_excel(file_path)
+        df.columns = [str(c).strip() for c in df.columns]
+        return df
     return None
+
+df = load_local_data()
 
 st.sidebar.markdown('<div class="sidebar-title">⚡ TQG - Tuyến Đường</div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="sidebar-subtitle">Voice by BangNC13 - FPT Telecom System</div>', unsafe_allow_html=True)
 
-# 2. Nút tải dữ liệu Excel lên
-uploaded_file = st.sidebar.file_uploader("📂 Tải file Excel dữ liệu", type=["xlsx", "xls"])
-
-df = None
-if uploaded_file is not None:
-    df = pd.read_excel(uploaded_file)
-else:
-    df = load_server_data()
-
-selected_pops = []
-
 if df is not None:
-    df.columns = [str(col).strip() for col in df.columns]
+    # Trích xuất mã POP (lấy chuỗi trước dấu chấm, ví dụ: TQGM001 từ TQGM001.0001/FO)
+    df['POP'] = df['Tên đối tượng'].apply(lambda x: str(x).split('.')[0] if '.' in str(x) else str(x))
+    pop_list = sorted(df['POP'].unique())
+
+    selected_pops = st.sidebar.multiselect(
+        "LỌC DỮ LIỆU POP", 
+        options=pop_list, 
+        default=st.session_state.selected_pops,
+        key="pop_multiselect"
+    )
     
-    lat_col1 = next((c for c in df.columns if 'lat' in c.lower() and '1' in c.lower()), None)
-    lon_col1 = next((c for c in df.columns if 'lng' in c.lower() or ('lon' in c.lower() and '1' in c.lower())), None)
-    lat_col2 = next((c for c in df.columns if 'lat' in c.lower() and '2' in c.lower()), None)
-    lon_col2 = next((c for c in df.columns if 'lng' in c.lower() or ('lon' in c.lower() and '2' in c.lower())), None)
+    col_r1, col_r2 = st.sidebar.columns([1, 1])
+    with col_r1:
+        if st.button("🔄 Reset bộ lọc", use_container_width=True):
+            st.session_state.selected_pops = []
+            st.session_state.calculated_route = []
+            st.rerun()
 
-    if not lat_col1:
-        lat_col1 = next((c for c in df.columns if 'lat' in c.lower() or 'vĩ độ' in c.lower()), None)
-        lon_col1 = next((c for c in df.columns if 'lng' in c.lower() or 'lon' in c.lower() or 'kinh độ' in c.lower()), None)
-
-    # Ô chọn danh sách POP
-    if 'Tên đoạn cáp' in df.columns:
-        df['POP'] = df['Tên đoạn cáp'].apply(lambda x: str(x).split('.')[0] if '.' in str(x) else str(x))
-        pop_list = sorted(df['POP'].unique())
-        
-        selected_pops = st.sidebar.multiselect(
-            "LỌC DỮ LIỆU POP", 
-            options=pop_list, 
-            default=st.session_state.selected_pops,
-            key="pop_multiselect"
-        )
-        
-        col_r1, col_r2 = st.sidebar.columns([1, 1])
-        with col_r1:
-            if st.button("🔄 Reset bộ lọc", use_container_width=True):
-                st.session_state.selected_pops = []
-                st.session_state.break_result = None
-                st.session_state.break_gps = None
-                st.session_state.calculated_route = []
-                st.rerun()
-
-        if selected_pops:
-            pop_df = df[df['POP'].isin(selected_pops)].copy()
-        else:
-            pop_df = df.copy()
+    # Lọc dữ liệu theo POP được chọn
+    if selected_pops:
+        filtered_df = df[df['POP'].isin(selected_pops)].copy()
     else:
-        pop_df = df.copy()
+        filtered_df = df.copy()
 
-    G = nx.Graph()
-    node_coords = {}
-
-    for _, row in pop_df.iterrows():
-        k1 = str(row.get('Điểm KN1', '')).strip()
-        k2 = str(row.get('Điểm KN2', '')).strip()
-        cable = str(row.get('Tên đoạn cáp', f"{k1}-{k2}")).strip()
-        
-        len_val = row.get('Chiều dài thực (m)')
-        length = float(len_val) if pd.notnull(len_val) else 0.0
-        
+    # Danh sách tọa độ và marker
+    target_points = []
+    for _, row in filtered_df.iterrows():
         try:
-            if lat_col1 and lon_col1 and pd.notnull(row[lat_col1]) and pd.notnull(row[lon_col1]):
-                node_coords[k1] = (float(row[lat_col1]), float(row[lon_col1]))
-            if lat_col2 and lon_col2 and pd.notnull(row[lat_col2]) and pd.notnull(row[lon_col2]):
-                node_coords[k2] = (float(row[lat_col2]), float(row[lon_col2]))
+            name = str(row['Tên đối tượng']).strip()
+            lat = float(row['Latitude'])
+            lon = float(row['Longitude'])
+            target_points.append({"name": name, "coords": (lat, lon)})
         except Exception:
-            pass
-
-        if k1 and k2:
-            G.add_edge(k1, k2, cable=cable, length=length)
+            continue
 
     st.sidebar.markdown("---")
     
-    # Nút bấm tính lộ trình tối ưu
+    # Nút "Bấm" tính toán lộ trình tối ưu
     if st.sidebar.button("🚀 Bấm", type="primary", use_container_width=True):
-        if 'Tên đoạn cáp' in df.columns and not selected_pops:
+        if not selected_pops:
             st.sidebar.warning("⚠️ Vui lòng chọn ít nhất 1 POP để tính lộ trình!")
-        elif not node_coords:
-            st.sidebar.error("❌ Không có tọa độ hợp lệ trong dữ liệu.")
+        elif not target_points:
+            st.sidebar.error("❌ Không tìm thấy tọa độ hợp lệ.")
         else:
-            start_pos = st.session_state.user_gps if st.session_state.user_gps else list(node_coords.values())[0]
-            target_points = [{"name": name, "coords": coords} for name, coords in node_coords.items()]
-            
+            start_pos = st.session_state.user_gps if st.session_state.user_gps else target_points[0]['coords']
             st.session_state.calculated_route = calculate_optimal_route(start_pos, target_points)
             st.rerun()
 
+    # Hiển thị kết quả lộ trình
     if st.session_state.calculated_route:
         st.sidebar.markdown("### 🚗 LỘ TRÌNH TỐI ƯU")
         for idx, step in enumerate(st.session_state.calculated_route, 1):
-            st.sidebar.markdown(f"**{idx}.** Đến `{step['name']}`")
+            st.sidebar.markdown(f"**{idx}.** `{step['name']}`")
         
         if st.session_state.user_gps:
             waypoints_str = "/".join([f"{item['coords'][0]},{item['coords'][1]}" for item in st.session_state.calculated_route])
             gmaps_url = f"https://www.google.com/maps/dir/{st.session_state.user_gps[0]},{st.session_state.user_gps[1]}/{waypoints_str}"
             st.sidebar.link_button("🗺️ Mở lộ trình trên Google Maps", gmaps_url, type="secondary", use_container_width=True)
 
-    # Dữ liệu Bản đồ
-    map_center = [21.0285, 105.8542]
-    zoom_lvl = 12
+    # Cấu hình bản đồ Leaflet
+    map_center = [21.816, 105.208]
+    if target_points:
+        map_center = [target_points[0]['coords'][0], target_points[0]['coords'][1]]
 
-    if len(node_coords) > 0:
-        first_coord = list(node_coords.values())[0]
-        map_center = [first_coord[0], first_coord[1]]
-        zoom_lvl = 15
-
-    polylines = []
-    markers = []
-
-    for u, v, data in G.edges(data=True):
-        if u in node_coords and v in node_coords:
-            polylines.append({
-                "coords": [node_coords[u], node_coords[v]],
-                "color": "#38BDF8",
-                "weight": 3,
-                "opacity": 0.7,
-                "tooltip": f"Cáp: {data.get('cable', '')}"
-            })
-
-    for node_id, coord in node_coords.items():
-        markers.append({
-            "coords": coord,
-            "popup": f"<b>Điểm KN:</b> {node_id}",
-            "tooltip": str(node_id),
-            "color": "#818CF8",
-            "radius": 5
-        })
+    markers = [{"coords": pt["coords"], "popup": f"<b>Điểm:</b> {pt['name']}", "tooltip": pt["name"]} for pt in target_points]
 
     route_polyline = None
     if st.session_state.calculated_route:
-        start_pt = list(st.session_state.user_gps) if st.session_state.user_gps else [st.session_state.calculated_route[0]['coords'][0], st.session_state.calculated_route[0]['coords'][1]]
+        start_pt = list(st.session_state.user_gps) if st.session_state.user_gps else list(st.session_state.calculated_route[0]['coords'])
         r_coords = [start_pt] + [list(item['coords']) for item in st.session_state.calculated_route]
         route_polyline = {
             "coords": r_coords,
@@ -293,7 +223,6 @@ if df is not None:
             "dashArray": "8, 8"
         }
 
-    polylines_json = json.dumps(polylines)
     markers_json = json.dumps(markers)
     route_polyline_json = json.dumps(route_polyline)
     map_center_json = json.dumps(map_center)
@@ -321,10 +250,6 @@ if df is not None:
             }}
             .leaflet-control-layers-toggle {{
                 filter: invert(1);
-            }}
-            .leaflet-control-zoom-in, .leaflet-control-zoom-out {{
-                color: #F8FAFC !important;
-                background-color: #1E293B !important;
             }}
             .user-location-marker {{
                 background-color: #3B82F6;
@@ -358,7 +283,7 @@ if df is not None:
                     zoomControl: true,
                     attributionControl: false,
                     layers: [googleStreets]
-                }}).setView({map_center_json}, {zoom_lvl});
+                }}).setView({map_center_json}, 14);
 
                 var baseMaps = {{
                     "🗺️ Google Đường phố": googleStreets,
@@ -367,23 +292,17 @@ if df is not None:
                 }};
                 L.control.layers(baseMaps, null, {{ position: 'topright' }}).addTo(map);
 
-                var polylinesData = {polylines_json};
-                polylinesData.forEach(function(item) {{
-                    var line = L.polyline(item.coords, {{
-                        color: item.color, weight: item.weight, opacity: item.opacity
-                    }}).addTo(map);
-                    if (item.tooltip) line.bindTooltip(item.tooltip);
-                }});
-
+                // Hiển thị các Marker điểm từ file QuanLyTĐ.xlsx
                 var markersData = {markers_json};
                 markersData.forEach(function(item) {{
                     var circle = L.circleMarker(item.coords, {{
-                        radius: item.radius, color: item.color, fillColor: '#0F172A', fillOpacity: 0.9, weight: 2
+                        radius: 6, color: '#818CF8', fillColor: '#0F172A', fillOpacity: 0.9, weight: 2
                     }}).addTo(map);
                     if (item.popup) circle.bindPopup(item.popup);
                     if (item.tooltip) circle.bindTooltip(item.tooltip);
                 }});
 
+                // Vẽ lộ trình kết nối các điểm
                 var routeData = {route_polyline_json};
                 if (routeData && routeData.coords) {{
                     L.polyline(routeData.coords, {{
@@ -394,6 +313,7 @@ if df is not None:
                     }}).addTo(map);
                 }}
 
+                // Định vị vị trí GPS thiết bị
                 var userMarker = null;
                 var accuracyCircle = null;
 
@@ -469,4 +389,4 @@ if df is not None:
     components.html(leaflet_html, height=1000, scrolling=False)
 
 else:
-    st.info("💡 Vui lòng tải file Excel dữ liệu ở thanh bên trái (Sidebar) để hiển thị ứng dụng.")
+    st.error("❌ Không tìm thấy file `QuanLyTĐ.xlsx` trong thư mục làm việc.")
