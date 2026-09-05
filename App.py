@@ -12,7 +12,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🗺️ Quản lý Tập điểm & Chỉ đường Tối ưu Xe máy")
+st.title("Tối ưu quãng đường thu cước TQG")
 
 # 1. Hàm nạp dữ liệu từ file Excel
 @st.cache_data
