@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS Tùy chỉnh Dark Theme toàn bộ App & Sidebar
+# CSS Tùy chỉnh Dark Theme
 st.markdown("""
     <style>
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
@@ -99,7 +99,7 @@ if "user_gps" not in st.session_state:
 if "calculated_route" not in st.session_state:
     st.session_state.calculated_route = []
 
-# Đọc tọa độ GPS từ tham số URL (được gửi từ JS Geolocation)
+# Đọc tọa độ GPS từ URL
 query_params = st.query_params
 if "user_lat" in query_params and "user_lon" in query_params:
     try:
@@ -107,7 +107,6 @@ if "user_lat" in query_params and "user_lon" in query_params:
     except Exception:
         pass
 
-# Hàm tính khoảng cách Haversine (km) giữa 2 tọa độ GPS
 def haversine(coord1, coord2):
     R = 6371.0
     lat1, lon1 = math.radians(coord1[0]), math.radians(coord1[1])
@@ -118,7 +117,6 @@ def haversine(coord1, coord2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
-# Thuật toán Nearest Neighbor tìm lộ trình di chuyển tối ưu
 def calculate_optimal_route(start_gps, target_points):
     if not target_points:
         return []
@@ -135,7 +133,7 @@ def calculate_optimal_route(start_gps, target_points):
 
     return route
 
-@st.cache_data
+# Tải file mặc định từ Server nếu có
 def load_server_data():
     possible_files = [
         "Danh-Sách-Đoạn-Cáp.xlsx", 
@@ -143,27 +141,27 @@ def load_server_data():
         "data.xlsx", 
         "Danh-Sách-Đoạn-Cáp.xls"
     ]
-    
-    selected_file = None
     for f in possible_files:
         if os.path.exists(f):
-            selected_file = f
-            break
-
-    if not selected_file:
-        files = [f for f in os.listdir(".") if f.endswith(".xlsx") or f.endswith(".xls")]
-        if files:
-            selected_file = files[0]
-
-    if selected_file:
-        df = pd.read_excel(selected_file)
-        return df, selected_file
-    return None, None
-
-df, file_name = load_server_data()
+            return pd.read_excel(f)
+    files = [f for f in os.listdir(".") if f.endswith(".xlsx") or f.endswith(".xls")]
+    if files:
+        return pd.read_excel(files[0])
+    return None
 
 st.sidebar.markdown('<div class="sidebar-title">⚡ TQG - Tuyến Đường</div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="sidebar-subtitle">Voice by BangNC13 - FPT Telecom System</div>', unsafe_allow_html=True)
+
+# 2. Nút tải dữ liệu Excel lên
+uploaded_file = st.sidebar.file_uploader("📂 Tải file Excel dữ liệu", type=["xlsx", "xls"])
+
+df = None
+if uploaded_file is not None:
+    df = pd.read_excel(uploaded_file)
+else:
+    df = load_server_data()
+
+selected_pops = []
 
 if df is not None:
     df.columns = [str(col).strip() for col in df.columns]
@@ -229,21 +227,19 @@ if df is not None:
 
     st.sidebar.markdown("---")
     
-    # Nút "Bấm" tính toán lộ trình di chuyển tối ưu
+    # Nút bấm tính lộ trình tối ưu
     if st.sidebar.button("🚀 Bấm", type="primary", use_container_width=True):
-        if not selected_pops:
+        if 'Tên đoạn cáp' in df.columns and not selected_pops:
             st.sidebar.warning("⚠️ Vui lòng chọn ít nhất 1 POP để tính lộ trình!")
         elif not node_coords:
-            st.sidebar.error("❌ Không có tọa độ hợp lệ cho các POP đã chọn.")
+            st.sidebar.error("❌ Không có tọa độ hợp lệ trong dữ liệu.")
         else:
-            # Lấy vị trí GPS của thiết bị làm điểm xuất phát
             start_pos = st.session_state.user_gps if st.session_state.user_gps else list(node_coords.values())[0]
             target_points = [{"name": name, "coords": coords} for name, coords in node_coords.items()]
             
             st.session_state.calculated_route = calculate_optimal_route(start_pos, target_points)
             st.rerun()
 
-    # Hiển thị danh sách các bước di chuyển
     if st.session_state.calculated_route:
         st.sidebar.markdown("### 🚗 LỘ TRÌNH TỐI ƯU")
         for idx, step in enumerate(st.session_state.calculated_route, 1):
@@ -285,7 +281,6 @@ if df is not None:
             "radius": 5
         })
 
-    # Nối lộ trình tối ưu bằng đường nét đứt màu cam trên bản đồ
     route_polyline = None
     if st.session_state.calculated_route:
         start_pt = list(st.session_state.user_gps) if st.session_state.user_gps else [st.session_state.calculated_route[0]['coords'][0], st.session_state.calculated_route[0]['coords'][1]]
@@ -303,7 +298,6 @@ if df is not None:
     route_polyline_json = json.dumps(route_polyline)
     map_center_json = json.dumps(map_center)
 
-    # Giữ nguyên phần Leaflet JS và cơ chế nhận diện GPS trình duyệt
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -373,7 +367,6 @@ if df is not None:
                 }};
                 L.control.layers(baseMaps, null, {{ position: 'topright' }}).addTo(map);
 
-                // Vẽ Polylines cáp
                 var polylinesData = {polylines_json};
                 polylinesData.forEach(function(item) {{
                     var line = L.polyline(item.coords, {{
@@ -382,7 +375,6 @@ if df is not None:
                     if (item.tooltip) line.bindTooltip(item.tooltip);
                 }});
 
-                // Vẽ Markers điểm KN
                 var markersData = {markers_json};
                 markersData.forEach(function(item) {{
                     var circle = L.circleMarker(item.coords, {{
@@ -392,7 +384,6 @@ if df is not None:
                     if (item.tooltip) circle.bindTooltip(item.tooltip);
                 }});
 
-                // Vẽ Lộ trình tối ưu
                 var routeData = {route_polyline_json};
                 if (routeData && routeData.coords) {{
                     L.polyline(routeData.coords, {{
@@ -403,7 +394,6 @@ if df is not None:
                     }}).addTo(map);
                 }}
 
-                // Giữ nguyên GPS Vị trí người dùng
                 var userMarker = null;
                 var accuracyCircle = null;
 
@@ -479,4 +469,4 @@ if df is not None:
     components.html(leaflet_html, height=1000, scrolling=False)
 
 else:
-    st.error("❌ Không tìm thấy file Excel trên Server. Vui lòng kiểm tra lại file data trong thư mục.")
+    st.info("💡 Vui lòng tải file Excel dữ liệu ở thanh bên trái (Sidebar) để hiển thị ứng dụng.")
