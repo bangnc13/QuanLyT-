@@ -192,7 +192,6 @@ st.markdown("""
         color: #000000 !important;
     }
 
-    /* ẨN NÚT ZOOM (+/-) VÀ MENU LAYER CONTROL BẢN ĐỒ */
     .leaflet-control-zoom,
     .leaflet-control-layers {
         display: none !important;
@@ -210,10 +209,9 @@ def load_data(file_path):
     except Exception:
         return pd.DataFrame()
 
-# 4. THUẬT TOÁN TỐI ƯU LỘ TRÌNH VÒNG KÍN (ROUND-TRIP: BẮT ĐẦU = KẾT THÚC)
+# 4. THUẬT TOÁN TỐI ƯU LỘ TRÌNH VÒNG KÍN
 def get_optimized_route_roundtrip(origin, points_list):
     all_points = [{'Name': 'GPS ORIGIN', 'Latitude': origin[0], 'Longitude': origin[1]}] + points_list
-    
     coords_str = ";".join([f"{pt['Longitude']},{pt['Latitude']}" for pt in all_points])
     table_url = f"http://router.project-osrm.org/table/v1/driving/{coords_str}?annotations=duration,distance"
     
@@ -223,7 +221,6 @@ def get_optimized_route_roundtrip(origin, points_list):
             return None, [], 0, 0
             
         durations = res['durations']
-        
         unvisited = list(range(1, len(all_points)))
         current_idx = 0
         ordered_indices = []
@@ -305,7 +302,6 @@ with st.sidebar:
     )
     
     st.divider()
-    
     st.markdown("<div class='hud-label'>📡 Trạng thái định vị GPS REALTIME:</div>", unsafe_allow_html=True)
     
     if st.session_state.current_loc:
@@ -317,7 +313,7 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
     else:
-        st.info("Đang kết nối tín hiệu GPS Realtime...")
+        st.info("Đang chờ cấp quyền truy cập GPS...")
 
     st.divider()
 
@@ -387,36 +383,6 @@ folium.TileLayer(
     overlay=False
 ).add_to(m)
 
-# 5. HIỂN THỊ MŨI TÊN ĐỊNH HƯỚNG REALTIME QUAY THEO ĐIỆN THOẠI
-if st.session_state.current_loc:
-    # Biểu tượng Mũi Tên Navigation Cyber SVG
-    arrow_icon_html = """
-    <div id="user-heading-arrow" style="
-        width: 42px; 
-        height: 42px; 
-        display: flex; 
-        justify-content: center; 
-        align-items: center; 
-        transition: transform 0.15s ease-out; 
-        transform-origin: center center;
-    ">
-        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 0px 8px #00f0ff);">
-            <path d="M12 2L4.5 20.29 5.21 21 12 18 18.79 21 19.5 20.29 12 2Z" fill="#00F0FF" stroke="#FFFFFF" stroke-width="1.5" stroke-linejoin="round"/>
-        </svg>
-    </div>
-    """
-    
-    folium.Marker(
-        location=st.session_state.current_loc,
-        popup="<b>Vị trí & Hướng đi của bạn</b>",
-        tooltip="GPS REALTIME HEADING",
-        icon=folium.DivIcon(
-            icon_size=(42, 42),
-            icon_anchor=(21, 21),
-            html=arrow_icon_html
-        )
-    ).add_to(m)
-
 if st.session_state.ordered_points:
     for pt in st.session_state.ordered_points:
         folium.Marker(
@@ -450,32 +416,76 @@ if st.session_state.route_coords:
         tooltip="Cyber Round-Trip Route"
     ).add_to(m)
 
-# TỰ ĐỘNG BẮT SỰ KIỆN CLICK TRÊN BẢN ĐỒ VÀ BÁO VỀ TRÌNH DUYỆT MẸ ĐỂ THU GỌN SIDEBAR
-map_click_js = folium.Element("""
+# TÍCH HỢP ĐỊNH VỊ LIVE BẰNG LEAFLET JS NATIVE TRÊN BẢN ĐỒ
+gps_script = folium.Element("""
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        var mapContainer = document.querySelector('.folium-map');
-        if (mapContainer) {
-            mapContainer.addEventListener('click', function() {
-                try {
-                    window.parent.postMessage({type: 'CLOSE_STREAMLIT_SIDEBAR'}, '*');
-                } catch(e) {}
-            });
-            mapContainer.addEventListener('touchstart', function() {
-                try {
-                    window.parent.postMessage({type: 'CLOSE_STREAMLIT_SIDEBAR'}, '*');
-                } catch(e) {}
-            });
-        }
+        // Tìm đối tượng Leaflet Map
+        var checkMapExist = setInterval(function() {
+            var mapElement = document.querySelector('.folium-map');
+            if (mapElement && mapElement._leaflet_map) {
+                clearInterval(checkMapExist);
+                var map = mapElement._leaflet_map;
+
+                // Tạo Custom Marker Mũi Tên Navigation
+                var arrowIcon = L.divIcon({
+                    className: 'custom-gps-arrow',
+                    html: `<div id="user-heading-arrow" style="
+                        width: 42px; height: 42px; 
+                        display: flex; justify-content: center; align-items: center; 
+                        transition: transform 0.15s ease-out; transform-origin: center center;
+                    ">
+                        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 0px 8px #00f0ff);">
+                            <path d="M12 2L4.5 20.29 5.21 21 12 18 18.79 21 19.5 20.29 12 2Z" fill="#00F0FF" stroke="#FFFFFF" stroke-width="1.5" stroke-linejoin="round"/>
+                        </svg>
+                    </div>`,
+                    iconSize: [42, 42],
+                    iconAnchor: [21, 21]
+                });
+
+                var userMarker = null;
+
+                // Bắt sự kiện GPS di chuyển thực tế từ thiết bị
+                if ("geolocation" in navigator) {
+                    navigator.geolocation.watchPosition(function(position) {
+                        var lat = position.coords.latitude;
+                        var lng = position.coords.longitude;
+                        var newLatLng = new L.LatLng(lat, lng);
+
+                        if (!userMarker) {
+                            userMarker = L.marker(newLatLng, {icon: arrowIcon}).addTo(map);
+                            userMarker.bindTooltip("GPS REALTIME HEADING");
+                            map.setView(newLatLng, 16);
+                        } else {
+                            userMarker.setLatLng(newLatLng);
+                        }
+                    }, function(err) {
+                        console.warn("GPS Error: " + err.message);
+                    }, {
+                        enableHighAccuracy: true,
+                        maximumAge: 1000,
+                        timeout: 10000
+                    });
+                }
+
+                // Bắt sự kiện chạm vào bản đồ để đóng Sidebar
+                mapElement.addEventListener('click', function() {
+                    try { window.parent.postMessage({type: 'CLOSE_STREAMLIT_SIDEBAR'}, '*'); } catch(e) {}
+                });
+                mapElement.addEventListener('touchstart', function() {
+                    try { window.parent.postMessage({type: 'CLOSE_STREAMLIT_SIDEBAR'}, '*'); } catch(e) {}
+                });
+            }
+        }, 300);
     });
 </script>
 """)
-m.get_root().html.add_child(map_click_js)
+m.get_root().html.add_child(gps_script)
 
 from streamlit_folium import st_folium
 st_folium(m, use_container_width=True, height=1000)
 
-# 6. JAVASCRIPT LẮNG NGHE LA BÀN ĐIỆN THOẠI & GPS REALTIME TRACKING
+# 6. JAVASCRIPT LA BÀN & ĐỒNG BỘ TỌA ĐỘ BAN ĐẦU
 components.html("""
 <script>
     // A. THU GỌN SIDEBAR KHI CHẠM VÀO BẢN ĐỒ
@@ -497,11 +507,9 @@ components.html("""
     function handleOrientation(event) {
         let heading = null;
         if (event.webkitCompassHeading) {
-            // iOS Devices
-            heading = event.webkitCompassHeading;
+            heading = event.webkitCompassHeading; // iOS
         } else if (event.alpha !== null) {
-            // Android Devices
-            heading = 360 - event.alpha;
+            heading = 360 - event.alpha; // Android
         }
 
         if (heading !== null) {
@@ -513,7 +521,6 @@ components.html("""
         }
     }
 
-    // Yêu cầu quyền truy cập Cảm biến trên iOS nếu cần
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission()
             .then(response => {
@@ -527,36 +534,20 @@ components.html("""
         window.addEventListener('deviceorientation', handleOrientation, true);
     }
 
-    // C. REALTIME GPS TRACKING DI CHUYỂN
-    let lastLat = null;
-    let lastLon = null;
-
+    // C. CẬP NHẬT TỌA ĐỘ BAN ĐẦU VÀO URL (Chỉ chạy 1 lần để khởi tạo)
     if ("geolocation" in navigator) {
-        navigator.geolocation.watchPosition(
-            (position) => {
-                const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
-                
-                if (!lastLat || Math.abs(lat - lastLat) > 0.00004 || Math.abs(lon - lastLon) > 0.00004) {
-                    lastLat = lat;
-                    lastLon = lon;
-                    
-                    const parentWindow = window.parent;
-                    const currentUrl = new URL(parentWindow.location.href);
-                    currentUrl.searchParams.set('lat', lat);
-                    currentUrl.searchParams.set('lon', lon);
-                    parentWindow.history.replaceState({}, '', currentUrl);
-                }
-            },
-            (error) => {
-                console.error("Lỗi GPS:", error);
-            },
-            {
-                enableHighAccuracy: true,
-                maximumAge: 1000,
-                timeout: 5000
+        navigator.geolocation.getCurrentPosition((position) => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            const parentWindow = window.parent;
+            const currentUrl = new URL(parentWindow.location.href);
+            
+            if (!currentUrl.searchParams.get('lat')) {
+                currentUrl.searchParams.set('lat', lat);
+                currentUrl.searchParams.set('lon', lon);
+                parentWindow.location.href = currentUrl.href;
             }
-        );
+        });
     }
 </script>
 """, height=0, width=0)
