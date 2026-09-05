@@ -102,16 +102,26 @@ else:
     if waypoints:
         gmaps_full_route_url += f"&waypoints={urllib.parse.quote(waypoints)}"
 
-    # 6. Khởi tạo Bản đồ Google Maps Hybrid
+    # 6. Khởi tạo Bản đồ Google Maps (Ẩn nút zoom mặc định để đưa xuống góc dưới)
     center_lat = ordered_df['Latitude'].mean()
     center_lon = ordered_df['Longitude'].mean()
 
     m = folium.Map(
         location=[center_lat, center_lon], 
         zoom_start=13,
+        zoom_control=False,  # Tắt nút zoom mặc định góc trên trái
         tiles="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
         attr="Google Maps Hybrid"
     )
+
+    # Đặt nút Zoom (+ -) xuống góc dưới bên phải (bottomright)
+    folium.plugins.FloatImage
+    m.add_child(folium.plugins.GroupedLayerControl()) if False else None
+    m.get_root().html.add_child(folium.Element('''
+        <script>
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+        </script>
+    '''))
 
     # Nút Định vị GPS Cyberpunk
     LocateControl(
@@ -161,17 +171,99 @@ else:
     '''
     m.get_root().html.add_child(folium.Element(hud_html))
 
-    # 8. Vẽ đường nối Laser Neon
+    # 8. Tích hợp Công cụ Chỉ đường Thông minh trực tiếp trên Map (Leaflet Routing Machine / OSRM)
+    node_options_js = "".join([f'<option value="{row["Latitude"]},{row["Longitude"]}">#{idx+1}. {row["Tên đối tượng"]}</option>' for idx, row in ordered_df.iterrows()])
+    
+    routing_hud_html = f'''
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+    
+    <div style="
+        position: fixed; 
+        bottom: 20px; 
+        left: 20px; 
+        z-index: 9999; 
+        background: rgba(13, 17, 23, 0.95);
+        border: 1px solid #30363d;
+        border-top: 3px solid #1f6beb;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
+        border-radius: 6px;
+        padding: 12px;
+        color: #e6edf3;
+        font-family: monospace;
+        width: 280px;
+    ">
+        <div style="font-size: 12px; font-weight: bold; color: #58a6ff; margin-bottom: 8px;">🧭 ON-MAP SMART ROUTING</div>
+        <div style="margin-bottom: 6px;">
+            <label style="font-size: 10px; color: #8b949e;">START NODE:</label><br>
+            <select id="start_node" style="width: 100%; background: #161b22; color: #00ffcc; border: 1px solid #30363d; padding: 4px; border-radius: 3px; font-family: monospace;">
+                {node_options_js}
+            </select>
+        </div>
+        <div style="margin-bottom: 10px;">
+            <label style="font-size: 10px; color: #8b949e;">END NODE:</label><br>
+            <select id="end_node" style="width: 100%; background: #161b22; color: #ff7b72; border: 1px solid #30363d; padding: 4px; border-radius: 3px; font-family: monospace;">
+                {node_options_js}
+            </select>
+        </div>
+        <button onclick="drawLiveRoute()" style="
+            width: 100%;
+            background: #238636;
+            color: white;
+            border: none;
+            padding: 6px;
+            border-radius: 3px;
+            font-weight: bold;
+            font-family: monospace;
+            cursor: pointer;
+        ">
+            ▶ NAVIGATE ON MAP
+        </button>
+    </div>
+
+    <script>
+        var routingControl = null;
+        function drawLiveRoute() {{
+            var startVal = document.getElementById('start_node').value.split(',');
+            var endVal = document.getElementById('end_node').value.split(',');
+            
+            var startLat = parseFloat(startVal[0]);
+            var startLon = parseFloat(startVal[1]);
+            var endLat = parseFloat(endVal[0]);
+            var endLon = parseFloat(endVal[1]);
+
+            if (routingControl !== null) {{
+                map.removeControl(routingControl);
+            }}
+
+            routingControl = L.Routing.control({{
+                waypoints: [
+                    L.latLng(startLat, startLon),
+                    L.latLng(endLat, endLon)
+                ],
+                routeWhileDragging: false,
+                lineOptions: {{
+                    styles: [{{color: '#ff7b72', opacity: 0.9, weight: 6}}]
+                }},
+                show: false,
+                addWaypoints: false
+            }}).addTo(map);
+        }}
+    </script>
+    '''
+    m.get_root().html.add_child(folium.Element(routing_hud_html))
+
+    # 9. Vẽ đường chim bay tổng thể giữa các mốc
     route_coords = ordered_df[['Latitude', 'Longitude']].values.tolist()
     folium.PolyLine(
         route_coords, 
         color="#00ffcc", 
         weight=4, 
-        opacity=0.9, 
+        opacity=0.7, 
         dash_array='6, 6'
     ).add_to(m)
 
-    # 9. Marker điểm mốc Robotic HUD
+    # 10. Marker điểm mốc Robotic HUD
     for idx, row in ordered_df.iterrows():
         seq_num = idx + 1
         direct_gmaps_url = f"https://www.google.com/maps/dir/?api=1&destination={row['Latitude']},{row['Longitude']}"
@@ -204,7 +296,7 @@ else:
                 font-size: 11px;
                 font-weight: bold;
             ">
-                🧭 NAVIGATE TO NODE
+                🧭 NAVIGATE TO NODE (GMAPS)
             </a>
         </div>
         """
