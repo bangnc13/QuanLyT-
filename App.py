@@ -33,8 +33,8 @@ st.markdown("""
         background-color: #1a0a00 !important;
     }
 
-    /* Ép tất cả văn bản thường thành màu TRẮNG */
-    html, body, [class*="css"], .stMarkdown, p, span, label, div {
+    /* Ép văn bản thường thành màu TRẮNG (không ảnh hưởng tới multiselect) */
+    html, body, .stMarkdown, p, label {
         color: #ffffff !important;
     }
 
@@ -112,16 +112,49 @@ st.markdown("""
         opacity: 0.5;
     }
 
-    /* === ĐỔI MÀU CHỮ CÁC OPTION ĐÃ CHỌN TRONG MULTISELECT SANG XANH NEON === */
-    span[data-baseweb="tag"] span {
+    /* ================= CẤU HÌNH MULTISELECT CHUẨN XANH NEON ================= */
+    
+    /* 1. Đổi màu khung chứa ô input */
+    [data-baseweb="select"] > div {
+        background-color: #1f0c00 !important;
+        border: 1px solid #ff6600 !important;
+        color: #00f0ff !important;
+    }
+
+    /* 2. Đổi màu chữ Placeholder ("Choose options") sang xanh Neon */
+    [data-baseweb="select"] div[role="button"],
+    [data-baseweb="select"] input,
+    [data-baseweb="select"] input::placeholder {
+        color: #00f0ff !important;
+        -webkit-text-fill-color: #00f0ff !important;
+    }
+
+    /* 3. Đổi màu thẻ tag đối tượng ĐÃ CHỌN sang màu Xanh Cyan Neon */
+    span[data-baseweb="tag"] {
+        background-color: rgba(0, 240, 255, 0.2) !important;
+        border: 1px solid #00f0ff !important;
+    }
+
+    span[data-baseweb="tag"] * {
         color: #00f0ff !important;
         font-weight: bold !important;
     }
 
-    /* Đổi viền và nền của tag cho khớp style Cyberpunk */
-    span[data-baseweb="tag"] {
-        background-color: rgba(0, 240, 255, 0.15) !important;
+    /* 4. Đổi màu danh sách gợi ý (Dropdown List khi bấm vào ô) */
+    ul[role="listbox"] {
+        background-color: #1f0c00 !important;
         border: 1px solid #00f0ff !important;
+    }
+
+    /* 5. Đổi màu chữ các lựa chọn trong Dropdown List sang màu Xanh Neon */
+    li[role="option"] span,
+    li[role="option"] div {
+        color: #00f0ff !important;
+    }
+
+    /* 6. Hiệu ứng Hover vào item trong danh sách */
+    li[role="option"]:hover {
+        background-color: rgba(0, 240, 255, 0.2) !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -204,6 +237,7 @@ with st.sidebar:
     selected_names = st.multiselect(
         "🎯 Chọn danh sách tập điểm cần đi :",
         options=options,
+        placeholder="Choose options",
         help="Chọn các mục tiêu cần quét lộ trình"
     )
     
