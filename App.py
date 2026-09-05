@@ -111,6 +111,18 @@ st.markdown("""
         border-color: #ff6600 !important;
         opacity: 0.5;
     }
+
+    /* === ĐỔI MÀU CHỮ CÁC OPTION ĐÃ CHỌN TRONG MULTISELECT SANG XANH NEON === */
+    span[data-baseweb="tag"] span {
+        color: #00f0ff !important;
+        font-weight: bold !important;
+    }
+
+    /* Đổi viền và nền của tag cho khớp style Cyberpunk */
+    span[data-baseweb="tag"] {
+        background-color: rgba(0, 240, 255, 0.15) !important;
+        border: 1px solid #00f0ff !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
