@@ -13,39 +13,30 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Inject CSS Custom: Theme Nền Cam Robotic & Layout Full Edge
+# 2. Inject CSS Custom
 st.markdown("""
 <style>
-    /* Nhập font Cyberpunk / Sci-Fi */
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
 
-    /* Bỏ hoàn toàn Padding khu vực Main Content */
     .block-container {
-        padding-top: 0rem !important;
-        padding-bottom: 0rem !important;
-        padding-left: 0rem !important;
-        padding-right: 0rem !important;
+        padding: 0rem !important;
         max-width: 100% !important;
     }
 
-    /* Đổi nền chính toàn ứng dụng sang màu Cam Tối / Cam Cyberpunk */
     .stApp {
         background-color: #1a0a00 !important;
     }
 
-    /* Ép văn bản thường thành màu TRẮNG (không ảnh hưởng tới multiselect) */
     html, body, .stMarkdown, p, label {
         color: #ffffff !important;
     }
 
-    /* Tối ưu nền Sidebar dạng Dark Orange Robotic Gradient */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #331400 0%, #1f0c00 100%) !important;
         border-right: 2px solid #ff6600 !important;
         box-shadow: 5px 0px 15px rgba(255, 102, 0, 0.4) !important;
     }
 
-    /* Style Tiêu đề Sidebar - Giữ màu Cyan Neon nổi bật trên nền cam */
     .robot-title {
         font-family: 'Orbitron', sans-serif;
         color: #00f0ff !important;
@@ -57,7 +48,6 @@ st.markdown("""
         margin-bottom: 20px;
     }
 
-    /* Nút bấm kiểu ROBOTIC CYBERPUNK - Giữ nguyên Gradient Neon */
     div.stButton > button {
         font-family: 'Orbitron', sans-serif !important;
         font-weight: 700 !important;
@@ -79,7 +69,6 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    /* Container hiển thị thông số dạng HUD display - Nền Cam Đen */
     .hud-card {
         background: rgba(51, 20, 0, 0.85) !important;
         border: 1px solid #ff6600 !important;
@@ -91,14 +80,12 @@ st.markdown("""
         font-family: 'Rajdhani', sans-serif;
     }
 
-    /* Nhãn chữ thường - Màu TRẮNG */
     .hud-label {
         color: #ffffff !important;
         font-size: 0.85rem;
         text-transform: uppercase;
     }
 
-    /* Giá trị thông số - Giữ màu Cyan Neon */
     .hud-value {
         color: #00f0ff !important;
         font-size: 1.3rem;
@@ -106,22 +93,18 @@ st.markdown("""
         font-family: 'Orbitron', sans-serif;
     }
 
-    /* Divider phong cách Laser line Cam Neon */
     hr {
         border-color: #ff6600 !important;
         opacity: 0.5;
     }
 
-    /* ================= CẤU HÌNH MULTISELECT CHUẨN XANH NEON ================= */
-    
-    /* 1. Đổi màu khung chứa ô input */
+    /* MULTISELECT UI FIX */
     [data-baseweb="select"] > div {
         background-color: #1f0c00 !important;
         border: 1px solid #ff6600 !important;
         color: #00f0ff !important;
     }
 
-    /* 2. Đổi màu chữ Placeholder ("Choose options") sang xanh Neon */
     [data-baseweb="select"] div[role="button"],
     [data-baseweb="select"] input,
     [data-baseweb="select"] input::placeholder {
@@ -129,7 +112,6 @@ st.markdown("""
         -webkit-text-fill-color: #00f0ff !important;
     }
 
-    /* 3. Đổi màu thẻ tag đối tượng ĐÃ CHỌN sang màu Xanh Cyan Neon */
     span[data-baseweb="tag"] {
         background-color: rgba(0, 240, 255, 0.2) !important;
         border: 1px solid #00f0ff !important;
@@ -140,19 +122,15 @@ st.markdown("""
         font-weight: bold !important;
     }
 
-    /* 4. Đổi màu danh sách gợi ý (Dropdown List khi bấm vào ô) */
     ul[role="listbox"] {
         background-color: #1f0c00 !important;
         border: 1px solid #00f0ff !important;
     }
 
-    /* 5. Đổi màu chữ các lựa chọn trong Dropdown List sang màu Xanh Neon */
-    li[role="option"] span,
-    li[role="option"] div {
+    li[role="option"] span, li[role="option"] div {
         color: #00f0ff !important;
     }
 
-    /* 6. Hiệu ứng Hover vào item trong danh sách */
     li[role="option"]:hover {
         background-color: rgba(0, 240, 255, 0.2) !important;
     }
@@ -167,43 +145,61 @@ def load_data(file_path):
         df = df.dropna(subset=['Latitude', 'Longitude'])
         return df
     except Exception as e:
-        st.error(f"Lỗi đọc file: {e}")
         return pd.DataFrame()
 
-# 4. OSRM Route Optimization
-def get_optimized_route(origin, points_list):
-    coords_str = f"{origin[1]},{origin[0]}"
-    for pt in points_list:
-        coords_str += f";{pt['Longitude']},{pt['Latitude']}"
-
-    url = f"http://router.project-osrm.org/trip/v1/driving/{coords_str}?overview=full&geometries=geojson&source=first&roundtrip=false"
+# 4. THUẬT TOÁN TỐI ƯU LỘ TRÌNH MỚI (NEAREST NEIGHBOR VIA OSRM TABLE API)
+def get_optimized_route_v2(origin, points_list):
+    all_points = [{'Name': 'GPS ORIGIN', 'Latitude': origin[0], 'Longitude': origin[1]}] + points_list
+    
+    # Tạo chuỗi tọa độ cho OSRM Table API
+    coords_str = ";".join([f"{pt['Longitude']},{pt['Latitude']}" for pt in all_points])
+    table_url = f"http://router.project-osrm.org/table/v1/driving/{coords_str}?annotations=duration,distance"
     
     try:
-        res = requests.get(url, timeout=10).json()
-        if res.get('code') == 'Ok':
-            trip = res['trips'][0]
-            waypoints = res['waypoints']
+        res = requests.get(table_url, timeout=10).json()
+        if res.get('code') != 'Ok':
+            return None, [], 0, 0
             
-            route_coords = [(lat, lon) for lon, lat in trip['geometry']['coordinates']]
-            
-            ordered_points = []
-            for wp in waypoints:
-                idx = wp['waypoint_index']
-                if idx == 0:
-                    continue
-                
-                pt_info = points_list[idx - 1]
-                ordered_points.append({
-                    'Name': pt_info['Tên đối tượng'],
-                    'Latitude': pt_info['Latitude'],
-                    'Longitude': pt_info['Longitude'],
-                    'Order': len(ordered_points) + 1
-                })
-            
-            ordered_points.sort(key=lambda x: x['Order'])
-            return route_coords, ordered_points, trip['distance'] / 1000.0, trip['duration'] / 60.0
+        durations = res['durations'] # Ma trận thời gian giữa các điểm
+        
+        # Thuật toán Nearest Neighbor tìm chuỗi thứ tự chuẩn
+        unvisited = list(range(1, len(all_points)))
+        current_idx = 0
+        ordered_indices = []
+        
+        while unvisited:
+            next_idx = min(unvisited, key=lambda x: durations[current_idx][x])
+            ordered_indices.append(next_idx)
+            unvisited.remove(next_idx)
+            current_idx = next_idx
+
+        # Tạo danh sách điểm đã sắp xếp theo thứ tự tối ưu thực tế
+        ordered_points = []
+        route_coords_str = f"{origin[1]},{origin[0]}"
+        
+        for order, idx in enumerate(ordered_indices, 1):
+            pt = all_points[idx]
+            ordered_points.append({
+                'Name': pt['Tên đối tượng'],
+                'Latitude': pt['Latitude'],
+                'Longitude': pt['Longitude'],
+                'Order': order
+            })
+            route_coords_str += f";{pt['Longitude']},{pt['Latitude']}"
+
+        # Lấy hình tuyến đường chi tiết (Polyline) từ OSRM Route API
+        route_url = f"http://router.project-osrm.org/route/v1/driving/{route_coords_str}?overview=full&geometries=geojson"
+        route_res = requests.get(route_url, timeout=10).json()
+        
+        if route_res.get('code') == 'Ok':
+            route_data = route_res['routes'][0]
+            route_coords = [(lat, lon) for lon, lat in route_data['geometry']['coordinates']]
+            dist_km = route_data['distance'] / 1000.0
+            dur_min = route_data['duration'] / 60.0
+            return route_coords, ordered_points, dist_km, dur_min
+
     except Exception as e:
-        st.error(f"Lỗi kết nối OSRM API: {e}")
+        st.error(f"Lỗi tính toán lộ trình: {e}")
         
     return None, [], 0, 0
 
@@ -211,7 +207,6 @@ def get_optimized_route(origin, points_list):
 df = load_data('QuanLyTĐ.xlsx')
 
 if df.empty:
-    st.warning("⚠️ Không tìm thấy dữ liệu từ QuanLyTĐ.xlsx. Đang sử dụng dữ liệu giả lập mẫu.")
     df = pd.DataFrame({
         'Tên đối tượng': ['Điểm A', 'Điểm B', 'Điểm C'],
         'Latitude': [21.0285, 21.0350, 21.0200],
@@ -227,23 +222,20 @@ if 'ordered_points' not in st.session_state:
 if 'route_summary' not in st.session_state:
     st.session_state.route_summary = None
 
-# ================= SIDEBAR (ROBOTIC CONTROL CENTER) =================
+# ================= SIDEBAR =================
 with st.sidebar:
     st.markdown("<h2 class='robot-title'>🤖 Make By BangNC13</h2>", unsafe_allow_html=True)
-    st.caption("")
     
-    # 1. Chọn điểm
     options = df['Tên đối tượng'].tolist()
     selected_names = st.multiselect(
-        "🎯 Chọn danh sách tập điểm cần đi :",
+        "🎯 Chọn danh sách tập điểm cần đi (Tối đa 25):",
         options=options,
-        placeholder="Choose options",
-        help="Chọn các mục tiêu cần quét lộ trình"
+        max_selections=25,
+        placeholder="Choose options"
     )
     
     st.divider()
     
-    # 2. Định vị GPS
     st.markdown("<div class='hud-label'>📡 Trạng thái định vị GPS:</div>", unsafe_allow_html=True)
     loc_data = get_geolocation()
     
@@ -262,7 +254,6 @@ with st.sidebar:
 
     st.divider()
 
-    # 3. Nút kích hoạt lộ trình
     if st.button("⚡ Bấm xem lộ trình ⚡", use_container_width=True):
         if not st.session_state.current_loc:
             st.error("Chưa có tín hiệu GPS!")
@@ -272,8 +263,8 @@ with st.sidebar:
             selected_df = df[df['Tên đối tượng'].isin(selected_names)]
             points_list = selected_df.to_dict('records')
             
-            with st.spinner("🤖 Đang tính toán ma trận khoảng cách..."):
-                route_coords, ordered_points, dist_km, dur_min = get_optimized_route(
+            with st.spinner("🤖 Đang tính toán ma trận ma quỷ & tối ưu hóa..."):
+                route_coords, ordered_points, dist_km, dur_min = get_optimized_route_v2(
                     st.session_state.current_loc, points_list
                 )
                 
@@ -285,7 +276,6 @@ with st.sidebar:
                         'duration': dur_min
                     }
 
-    # Hiển thị HUD kết quả
     if st.session_state.route_summary:
         st.divider()
         st.markdown(f"""
@@ -301,15 +291,14 @@ with st.sidebar:
         for pt in st.session_state.ordered_points:
             st.markdown(f"<span style='color:#00f0ff;'>[{pt['Order']}]</span> <span style='color:#ffffff;'>{pt['Name']}</span>", unsafe_allow_html=True)
 
-# ================= HIỂN THỊ BẢN ĐỒ FULL CẠNH VIỀN (MAIN CONTENT) =================
+# ================= MAIN CONTENT MAP =================
 if st.session_state.current_loc:
     map_center = st.session_state.current_loc
 else:
     map_center = [df['Latitude'].mean(), df['Longitude'].mean()]
 
-m = folium.Map(location=map_center, zoom_start=15, tiles=None)
+m = folium.Map(location=map_center, zoom_start=14, tiles=None)
 
-# Google Maps Tile Layers
 folium.TileLayer(
     tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
     attr='Google Maps',
@@ -324,51 +313,46 @@ folium.TileLayer(
     overlay=False
 ).add_to(m)
 
-# 1. Đánh dấu GPS xuất phát
 if st.session_state.current_loc:
     folium.Marker(
         location=st.session_state.current_loc,
-        popup="<b style='color:#000000;'>Vị trí xuất phát (GPS CORE)</b>",
+        popup="<b>Vị trí xuất phát</b>",
         tooltip="GPS ORIGIN",
         icon=folium.Icon(color='red', icon='crosshairs', prefix='fa')
     ).add_to(m)
 
-# 2. Điểm ghé thăm Cyber Matrix Marker
 if st.session_state.ordered_points:
     for pt in st.session_state.ordered_points:
         folium.Marker(
             location=(pt['Latitude'], pt['Longitude']),
-            popup=f"<b style='color:#000000;'>Điểm {pt['Order']}: {pt['Name']}</b>",
+            popup=f"<b>Điểm {pt['Order']}: {pt['Name']}</b>",
             tooltip=f"TARGET [{pt['Order']}]: {pt['Name']}",
             icon=folium.DivIcon(
                 html=f"""<div style="
                     background: linear-gradient(135deg, #00f0ff 0%, #7000ff 100%);
                     color: white;
                     border-radius: 50%;
-                    width: 32px;
-                    height: 32px;
+                    width: 30px;
+                    height: 30px;
                     display: flex;
                     justify-content: center;
                     align-items: center;
                     font-weight: 900;
                     font-family: 'Orbitron', sans-serif;
                     border: 2px solid #ffffff;
-                    box-shadow: 0 0 12px rgba(0, 240, 255, 0.9);
+                    box-shadow: 0 0 10px rgba(0, 240, 255, 0.9);
                 ">{pt['Order']}</div>"""
             )
         ).add_to(m)
 
-# 3. Polyline Cyber Neon
 if st.session_state.route_coords:
     folium.PolyLine(
         st.session_state.route_coords,
         color="#00F0FF",
-        weight=6,
+        weight=5,
         opacity=0.9,
         tooltip="Cyber Route Trajectory"
     ).add_to(m)
 
 folium.LayerControl().add_to(m)
-
-# Render Map 100% VH
-st_folium(m, width="100%", height=920)
+st_folium(m, width="100%", height=900)
