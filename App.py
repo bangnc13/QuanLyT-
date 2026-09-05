@@ -106,4 +106,6 @@ st.markdown("""
         background: linear-gradient(135deg, #00f0ff 0%, #7000ff 100%) !important;
         border: none !important;
         border-radius: 4px !important;
-        padding: 12px 2
+        padding: 12px 24px !important;
+        text-transform: uppercase !important;
+        letter-spacing:
