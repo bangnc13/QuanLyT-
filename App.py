@@ -13,22 +13,30 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Inject CSS Custom: Theme Nền Cam Robotic & Layout Full Edge
+# 2. Inject CSS Custom: Theme Cam Robotic & Bản đồ tràn full 100% màn hình
 st.markdown("""
 <style>
     /* Nhập font Cyberpunk / Sci-Fi */
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
 
-    /* Bỏ hoàn toàn Padding khu vực Main Content */
+    /* Ẩn Header, Footer và Toolbar mặc định của Streamlit */
+    header, footer, [data-testid="stHeader"] {
+        display: none !important;
+    }
+
+    /* Bỏ hoàn toàn Padding khu vực Main Content để Map sát cạnh tuyệt đối */
     .block-container {
-        padding-top: 0rem !important;
-        padding-bottom: 0rem !important;
-        padding-left: 0rem !important;
-        padding-right: 0rem !important;
+        padding: 0rem !important;
+        margin: 0rem !important;
         max-width: 100% !important;
     }
 
-    /* Đổi nền chính toàn ứng dụng sang màu Cam Tối / Cam Cyberpunk */
+    /* Xóa khoảng trống thừa trong container chứa bản đồ */
+    [data-testid="stVerticalBlock"] {
+        gap: 0rem !important;
+    }
+
+    /* Đổi nền chính toàn ứng dụng sang màu Cam Tối */
     .stApp {
         background-color: #1a0a00 !important;
     }
@@ -45,7 +53,7 @@ st.markdown("""
         box-shadow: 5px 0px 15px rgba(255, 102, 0, 0.4) !important;
     }
 
-    /* Style Tiêu đề Sidebar - Giữ màu Cyan Neon nổi bật trên nền cam */
+    /* Style Tiêu đề Sidebar */
     .robot-title {
         font-family: 'Orbitron', sans-serif;
         color: #00f0ff !important;
@@ -57,7 +65,7 @@ st.markdown("""
         margin-bottom: 20px;
     }
 
-    /* Nút bấm kiểu ROBOTIC CYBERPUNK - Giữ nguyên Gradient Neon */
+    /* Nút bấm kiểu ROBOTIC CYBERPUNK */
     div.stButton > button {
         font-family: 'Orbitron', sans-serif !important;
         font-weight: 700 !important;
@@ -79,7 +87,7 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    /* Container hiển thị thông số dạng HUD display - Nền Cam Đen */
+    /* Container hiển thị thông số dạng HUD display */
     .hud-card {
         background: rgba(51, 20, 0, 0.85) !important;
         border: 1px solid #ff6600 !important;
@@ -91,14 +99,12 @@ st.markdown("""
         font-family: 'Rajdhani', sans-serif;
     }
 
-    /* Nhãn chữ thường - Màu TRẮNG */
     .hud-label {
         color: #ffffff !important;
         font-size: 0.85rem;
         text-transform: uppercase;
     }
 
-    /* Giá trị thông số - Giữ màu Cyan Neon */
     .hud-value {
         color: #00f0ff !important;
         font-size: 1.3rem;
@@ -106,10 +112,16 @@ st.markdown("""
         font-family: 'Orbitron', sans-serif;
     }
 
-    /* Divider phong cách Laser line Cam Neon */
+    /* Divider */
     hr {
         border-color: #ff6600 !important;
         opacity: 0.5;
+    }
+
+    /* Ép khung iframe của Folium tràn 100% chiều cao màn hình */
+    iframe {
+        height: 100vh !important;
+        width: 100% !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -190,7 +202,7 @@ with st.sidebar:
     # 1. Chọn điểm
     options = df['Tên đối tượng'].tolist()
     selected_names = st.multiselect(
-        "🎯 Chọn danh sách tập điểm cần đi :",
+        "🎯 Danh sách tập điểm target:",
         options=options,
         help="Chọn các mục tiêu cần quét lộ trình"
     )
@@ -324,5 +336,5 @@ if st.session_state.route_coords:
 
 folium.LayerControl().add_to(m)
 
-# Render Map 100% VH
-st_folium(m, width="100%", height=920)
+# Render Map 100% VH tràn full viền
+st_folium(m, width="100%", height=1000)
