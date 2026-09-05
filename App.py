@@ -173,7 +173,7 @@ if 'route_summary' not in st.session_state:
 # ================= SIDEBAR (ROBOTIC CONTROL CENTER) =================
 with st.sidebar:
     st.markdown("<h2 class='robot-title'>🤖 Make By BangNC13</h2>", unsafe_allow_html=True)
-    st.caption("⚡ Thống kê & Tối ưu lộ trình tự động")
+    st.caption("")
     
     # 1. Chọn điểm
     options = df['Tên đối tượng'].tolist()
