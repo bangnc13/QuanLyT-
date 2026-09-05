@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import folium
 from streamlit_folium import st_folium
+from streamlit_js_eval import get_geolocation
 
 # 1. Cấu hình trang & Sidebar mở mặc định
 st.set_page_config(layout="wide", page_title="TQG - Tuyến đường", initial_sidebar_state="expanded")
@@ -17,7 +18,6 @@ st.markdown("""
             padding: 0rem !important;
         }
         
-        /* Đảm bảo nút đóng/mở Sidebar hiển thị rõ nét */
         [data-testid="stSidebarCollapseButton"] {
             background-color: #ffffff !important;
             border: 1px solid #dcdfe6 !important;
@@ -27,7 +27,6 @@ st.markdown("""
             z-index: 999999 !important;
         }
 
-        /* Định dạng Sidebar bên trái */
         section[data-testid="stSidebar"] {
             background-color: #f0f2f5 !important;
             border-right: 1px solid #dcdfe6 !important;
@@ -36,20 +35,14 @@ st.markdown("""
             padding-top: 1rem;
         }
         
-        /* Styling Nút Bấm */
+        /* Styling các Nút Bấm */
         div.stButton > button {
             width: 100%;
-            background-color: #27ae60;
-            color: white;
             border-radius: 6px;
             font-weight: bold;
             border: none;
             padding: 10px 16px;
-            margin-top: 10px;
-        }
-        div.stButton > button:hover {
-            background-color: #219150;
-            color: white;
+            margin-top: 5px;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -67,7 +60,7 @@ except Exception as e:
     st.error(f"[SYSTEM ERROR]: Không thể nạp dữ liệu. Chi tiết: {e}")
     st.stop()
 
-# 4. Thuật toán Haversine & TSP
+# 4. Thuật toán Haversine & TSP xuất phát từ mốc cố định
 def haversine_matrix(coords):
     rads = np.radians(coords)
     lats, lons = rads[:, 0], rads[:, 1]
@@ -76,15 +69,14 @@ def haversine_matrix(coords):
     a = np.sin(dlat / 2.0)**2 + np.cos(lats[:, None]) * np.cos(lats[None, :]) * np.sin(dlon / 2.0)**2
     return 6371 * 2 * np.arcsin(np.sqrt(a))
 
-def solve_tsp(selected_df):
+def solve_tsp_from_start(selected_df):
     coords = selected_df[['Latitude', 'Longitude']].values
     dist_mat = haversine_matrix(coords)
     num_pts = len(coords)
     
-    unvisited = set(range(num_pts))
+    unvisited = set(range(1, num_pts)) # Ép buộc xuất phát từ điểm index 0 (Mốc đầu)
     current = 0
     path = [current]
-    unvisited.remove(current)
     total_dist = 0.0
     
     while unvisited:
@@ -96,14 +88,36 @@ def solve_tsp(selected_df):
         
     return path, total_dist
 
-# 5. Thanh Menu Sidebar đã tối giản & Đổi tên
+# Khởi tạo state lưu tọa độ vị trí hiện tại
+if 'my_location' not in st.session_state:
+    st.session_state['my_location'] = None
+
+# 5. Thanh Menu Sidebar
 with st.sidebar:
     st.markdown("<h3 style='color: #27ae60; font-size: 18px; margin-bottom: 2px;'>⚡ TQG - Tuyến đường</h3>", unsafe_allow_html=True)
     st.markdown("<p style='color: #2ab7ca; font-size: 11px; margin-bottom: 20px;'>Make by BangNC13</p>", unsafe_allow_html=True)
     
+    # Nút bấm lấy vị trí GPS hiện tại
+    if st.button("📍 Tôi đang đứng", type="primary"):
+        loc = get_geolocation()
+        if loc and 'coords' in loc:
+            st.session_state['my_location'] = {
+                'Tên đối tượng': '📍 Vị trí hiện tại của tôi',
+                'Latitude': loc['coords']['latitude'],
+                'Longitude': loc['coords']['longitude']
+            }
+            st.success("Đã lấy thành công vị trí hiện tại!")
+        else:
+            st.warning("Đang chờ phản hồi GPS... Hãy chấp nhận cấp quyền vị trí trên điện thoại/trình duyệt.")
+
+    if st.session_state['my_location']:
+        st.caption(f"Trạng thái: Đã xác định vị trí xuất phát")
+
+    st.markdown("<hr style='margin: 10px 0; border: none; border-top: 1px solid #dcdfe6;'>", unsafe_allow_html=True)
+
     all_objects = df['Tên đối tượng'].tolist()
     
-    # Chỉ giữ lại Mục Lọc dữ liệu POP
+    # Lọc dữ liệu POP
     st.markdown("**LỌC DỮ LIỆU POP**")
     selected_names = st.multiselect(
         "Lọc dữ liệu POP",
@@ -112,16 +126,23 @@ with st.sidebar:
         label_visibility="collapsed"
     )
     
-    # Thêm nút Bấm
     btn_click = st.button("Bấm")
 
-# 6. Hiển thị Bản đồ bên phải
-if len(selected_names) < 2:
-    st.info("Vui lòng chọn từ 2 điểm trở lên trong Menu bên trái để hiển thị bản đồ.")
+# 6. Xử lý & Hiển thị Bản đồ
+if len(selected_names) == 0:
+    st.info("Vui lòng chọn các điểm dừng trong Menu bên trái để hiển thị bản đồ.")
 else:
     selected_df = df[df['Tên đối tượng'].isin(selected_names)].reset_index(drop=True)
-    path_indices, total_km = solve_tsp(selected_df)
-    ordered_df = selected_df.iloc[path_indices].reset_index(drop=True)
+    
+    # Nếu đã bấm nút "Tôi đang đứng", ghép vị trí GPS làm điểm xuất phát đầu tiên
+    if st.session_state['my_location']:
+        start_row = pd.DataFrame([st.session_state['my_location']])
+        full_df = pd.concat([start_row, selected_df], ignore_index=True)
+    else:
+        full_df = selected_df.copy()
+
+    path_indices, total_km = solve_tsp_from_start(full_df)
+    ordered_df = full_df.iloc[path_indices].reset_index(drop=True)
 
     center_lat = ordered_df['Latitude'].mean()
     center_lon = ordered_df['Longitude'].mean()
@@ -135,17 +156,20 @@ else:
         attr="Google Maps Standard"
     )
 
-    # Đưa nút Zoom (+ -) xuống góc dưới bên phải
+    # Đưa nút Zoom (+ -) xuống góc dưới phải
     m.get_root().html.add_child(folium.Element('''
         <script>
             L.control.zoom({ position: 'bottomright' }).addTo(map);
         </script>
     '''))
 
-    # Nút bấm góc trên trái bản đồ
+    # Nút bấm góc trên trái bản đồ mở Google Maps Chỉ đường từ điểm 1 tới điểm cuối
     first_target_lat = ordered_df.iloc[0]['Latitude']
     first_target_lon = ordered_df.iloc[0]['Longitude']
-    direct_gmaps_url = f"https://www.google.com/maps/dir/?api=1&destination={first_target_lat},{first_target_lon}"
+    last_target_lat = ordered_df.iloc[-1]['Latitude']
+    last_target_lon = ordered_df.iloc[-1]['Longitude']
+    
+    direct_gmaps_url = f"https://www.google.com/maps/dir/?api=1&origin={first_target_lat},{first_target_lon}&destination={last_target_lat},{last_target_lon}"
 
     map_overlay_buttons = f'''
     <div style="
@@ -158,28 +182,11 @@ else:
         gap: 6px;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     ">
-        <button onclick="locateUser()" style="
-            background: #ffffff;
-            color: #333333;
-            border: 1px solid #cccccc;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        ">
-            <span style="color: #ff4d4f;">🎯</span> GPS của tôi
-        </button>
-        
         <a href="{direct_gmaps_url}" target="_blank" style="
             background: #00b894;
             color: #ffffff;
             border: none;
-            padding: 6px 12px;
+            padding: 7px 12px;
             border-radius: 4px;
             font-size: 12px;
             font-weight: bold;
@@ -189,34 +196,13 @@ else:
             align-items: center;
             gap: 5px;
         ">
-            🛣️ Chỉ đường tới điểm
+            🛣️ Mở lộ trình trên Google Maps
         </a>
     </div>
-
-    <script>
-        function locateUser() {{
-            if (navigator.geolocation) {{
-                navigator.geolocation.getCurrentPosition(function(position) {{
-                    var userLat = position.coords.latitude;
-                    var userLon = position.coords.longitude;
-                    map.setView([userLat, userLon], 15);
-                    L.circleMarker([userLat, userLon], {{
-                        radius: 8,
-                        fillColor: "#00b894",
-                        color: "#ffffff",
-                        weight: 2,
-                        fillOpacity: 0.9
-                    }}).addTo(map).bindPopup("📍 Vị trí hiện tại của bạn").openPopup();
-                }}, function() {{
-                    alert("Không thể lấy dữ liệu GPS.");
-                }});
-            }}
-        }}
-    </script>
     '''
     m.get_root().html.add_child(folium.Element(map_overlay_buttons))
 
-    # Vẽ đường tuyến nối các điểm
+    # Vẽ đường lộ trình tối ưu nối các tập điểm
     route_coords = ordered_df[['Latitude', 'Longitude']].values.tolist()
     folium.PolyLine(
         route_coords, 
@@ -225,21 +211,25 @@ else:
         opacity=0.8
     ).add_to(m)
 
-    # Đặt Marker các điểm mốc tròn màu xanh
+    # Đặt Marker đánh số thứ tự lộ trình
     for idx, row in ordered_df.iterrows():
         seq_num = idx + 1
+        is_my_location = (row['Tên đối tượng'] == '📍 Vị trí hiện tại của tôi')
+        
+        bg_color = "#ff4d4f" if is_my_location else "#3867d6" # Màu đỏ cho điểm xuất phát của bạn
+        
         marker_icon_html = f'''
             <div style="
                 font-family: sans-serif;
                 font-size: 10pt; 
                 color: #ffffff; 
-                background-color: #3867d6; 
+                background-color: {bg_color}; 
                 border: 2px solid #ffffff;
                 border-radius: 50%; 
-                width: 24px; 
-                height: 24px; 
+                width: 26px; 
+                height: 26px; 
                 text-align: center; 
-                line-height: 20px; 
+                line-height: 22px; 
                 font-weight: bold;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
                 {seq_num}
@@ -251,5 +241,5 @@ else:
             icon=folium.DivIcon(html=marker_icon_html)
         ).add_to(m)
 
-    # Render bản đồ tràn khung
+    # Render bản đồ tràn màn hình
     st_folium(m, width="100%", height=850, returned_objects=[])
