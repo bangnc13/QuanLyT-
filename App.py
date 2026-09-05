@@ -37,20 +37,30 @@ st.markdown("""
         box-shadow: 5px 0px 15px rgba(255, 102, 0, 0.4) !important;
     }
 
-    /* ================= TRONG SUỐT THANH HEADER TÊN CÙNG (CHỨA NÚT SHARE) ================= */
+    /* TRONG SUỐT THANH HEADER TÊN CÙNG */
     header[data-testid="stHeader"] {
         background-color: transparent !important;
         background: transparent !important;
     }
 
-    /* Đổi màu biểu tượng và chữ "Share" sang màu trắng cho nổi bật trên nền tối */
     header[data-testid="stHeader"] * {
         color: #ffffff !important;
         fill: #ffffff !important;
     }
 
-    /* (LƯU Ý): Nếu muốn ẨN HOÀN TOÀN thanh Share này, bạn chỉ cần bỏ ghi chú dòng bên dưới: */
-    /* header[data-testid="stHeader"] { display: none !important; } */
+    /* ================= TRONG SUỐT KHU VỰC BẢN ĐỒ VÀ PHẦN DƯỚI BẢN ĐỒ ================= */
+    /* Làm trong suốt iframe chứa bản đồ folium và các container xung quanh */
+    iframe {
+        background-color: transparent !important;
+    }
+    
+    [data-element-container="true"] {
+        background-color: transparent !important;
+    }
+
+    .stMainBlockContainer, [data-testid="stMainBlockContainer"] {
+        background-color: transparent !important;
+    }
 
     .robot-title {
         font-family: 'Orbitron', sans-serif;
@@ -150,7 +160,7 @@ st.markdown("""
         background-color: rgba(0, 240, 255, 0.2) !important;
     }
 
-    /* ================= NÚT COLLAPSE/EXPAND SIDEBAR NEON XANH ================= */
+    /* NÚT COLLAPSE/EXPAND SIDEBAR NEON XANH */
     [data-testid="stSidebarCollapseButton"] button,
     [data-testid="stSidebarExpandButton"] button {
         background-color: #1f0c00 !important;
@@ -186,7 +196,7 @@ st.markdown("""
         color: #000000 !important;
     }
 
-    /* ================= TRONG SUỐT MENU TRÊN BẢN ĐỒ (FOLIUM LAYER CONTROL) ================= */
+    /* MENU TRÊN BẢN ĐỒ (FOLIUM LAYER CONTROL) */
     .leaflet-control-layers {
         background: rgba(31, 12, 0, 0.4) !important;
         backdrop-filter: blur(8px) !important;
@@ -233,7 +243,6 @@ def load_data(file_path):
 def get_optimized_route_roundtrip(origin, points_list):
     all_points = [{'Name': 'GPS ORIGIN', 'Latitude': origin[0], 'Longitude': origin[1]}] + points_list
     
-    # Chuỗi tọa độ cho OSRM Table API
     coords_str = ";".join([f"{pt['Longitude']},{pt['Latitude']}" for pt in all_points])
     table_url = f"http://router.project-osrm.org/table/v1/driving/{coords_str}?annotations=duration,distance"
     
@@ -244,7 +253,6 @@ def get_optimized_route_roundtrip(origin, points_list):
             
         durations = res['durations']
         
-        # Thuật toán Nearest Neighbor
         unvisited = list(range(1, len(all_points)))
         current_idx = 0
         ordered_indices = []
@@ -255,9 +263,8 @@ def get_optimized_route_roundtrip(origin, points_list):
             unvisited.remove(next_idx)
             current_idx = next_idx
 
-        # Tạo danh sách các điểm ghé thăm
         ordered_points = []
-        route_coords_str = f"{origin[1]},{origin[0]}" # Xuất phát từ Điểm Bắt Đầu
+        route_coords_str = f"{origin[1]},{origin[0]}"
         
         for order, idx in enumerate(ordered_indices, 1):
             pt = all_points[idx]
@@ -269,10 +276,8 @@ def get_optimized_route_roundtrip(origin, points_list):
             })
             route_coords_str += f";{pt['Longitude']},{pt['Latitude']}"
 
-        # NỐI LẠI ĐIỂM XUẤT PHÁT VÀO CUỐI LỘ TRÌNH (BẮT ĐẦU = KẾT THÚC)
         route_coords_str += f";{origin[1]},{origin[0]}"
 
-        # Lấy tuyến đường khép kín từ OSRM Route API
         route_url = f"http://router.project-osrm.org/route/v1/driving/{route_coords_str}?overview=full&geometries=geojson"
         route_res = requests.get(route_url, timeout=10).json()
         
@@ -442,4 +447,6 @@ if st.session_state.route_coords:
     ).add_to(m)
 
 folium.LayerControl().add_to(m)
-st_folium(m, width="100%", height=900)
+
+# Tăng chiều cao lên 100vh để bản đồ kéo dài phủ kín toàn bộ chiều cao màn hình
+st_folium(m, use_container_width=True, height=1000)
