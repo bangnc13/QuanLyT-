@@ -5,7 +5,7 @@ import folium
 from streamlit_folium import st_folium
 from streamlit_js_eval import get_geolocation
 
-# 1. Cấu hình trang Full-Width
+# 1. Cấu hình trang
 st.set_page_config(
     page_title="Hệ Thống Tối Ưu Lộ Trình - Robotic UI",
     page_icon="🤖",
@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Inject CSS Custom
+# 2. Inject CSS Custom (Đã fix hoàn toàn khoảng trắng dưới HUD Card)
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
@@ -45,7 +45,7 @@ st.markdown("""
         letter-spacing: 2px;
         text-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
         margin-top: 15px;
-        margin-bottom: 20px;
+        margin-bottom: 15px;
     }
 
     div.stButton > button {
@@ -69,13 +69,15 @@ st.markdown("""
         color: #ffffff !important;
     }
 
+    /* ĐÃ XÓA MARGIN DƯ THỪA ĐỂ LOẠI BỎ KHỎANG TRẮNG DƯỚI RADA */
     .hud-card {
         background: rgba(51, 20, 0, 0.85) !important;
         border: 1px solid #ff6600 !important;
         border-left: 4px solid #00f0ff !important;
         border-radius: 6px;
-        padding: 12px;
-        margin-top: 10px;
+        padding: 10px 12px;
+        margin-top: 5px !important;
+        margin-bottom: 0px !important;
         box-shadow: inset 0 0 10px rgba(255, 102, 0, 0.2);
         font-family: 'Rajdhani', sans-serif;
     }
@@ -88,14 +90,21 @@ st.markdown("""
 
     .hud-value {
         color: #00f0ff !important;
-        font-size: 1.3rem;
+        font-size: 1.2rem;
         font-weight: bold;
         font-family: 'Orbitron', sans-serif;
+    }
+
+    /* Ép sát các khoảng trắng do Streamlit Element tạo ra */
+    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div {
+        gap: 0.5rem !important;
     }
 
     hr {
         border-color: #ff6600 !important;
         opacity: 0.5;
+        margin-top: 10px !important;
+        margin-bottom: 10px !important;
     }
 
     /* MULTISELECT UI FIX */
@@ -137,7 +146,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Hàm nạp dữ liệu
+# (Các hàm xử lý dữ liệu & thuật toán giữ nguyên)
 @st.cache_data
 def load_data(file_path):
     try:
@@ -147,11 +156,8 @@ def load_data(file_path):
     except Exception:
         return pd.DataFrame()
 
-# 4. THUẬT TOÁN TỐI ƯU LỘ TRÌNH VÒNG KÍN (ROUND-TRIP: BẮT ĐẦU = KẾT THÚC)
 def get_optimized_route_roundtrip(origin, points_list):
     all_points = [{'Name': 'GPS ORIGIN', 'Latitude': origin[0], 'Longitude': origin[1]}] + points_list
-    
-    # Chuỗi tọa độ cho OSRM Table API
     coords_str = ";".join([f"{pt['Longitude']},{pt['Latitude']}" for pt in all_points])
     table_url = f"http://router.project-osrm.org/table/v1/driving/{coords_str}?annotations=duration,distance"
     
@@ -161,8 +167,6 @@ def get_optimized_route_roundtrip(origin, points_list):
             return None, [], 0, 0
             
         durations = res['durations']
-        
-        # Thuật toán Nearest Neighbor
         unvisited = list(range(1, len(all_points)))
         current_idx = 0
         ordered_indices = []
@@ -173,9 +177,8 @@ def get_optimized_route_roundtrip(origin, points_list):
             unvisited.remove(next_idx)
             current_idx = next_idx
 
-        # Tạo danh sách các điểm ghé thăm
         ordered_points = []
-        route_coords_str = f"{origin[1]},{origin[0]}" # Xuất phát từ Điểm Bắt Đầu
+        route_coords_str = f"{origin[1]},{origin[0]}"
         
         for order, idx in enumerate(ordered_indices, 1):
             pt = all_points[idx]
@@ -187,10 +190,8 @@ def get_optimized_route_roundtrip(origin, points_list):
             })
             route_coords_str += f";{pt['Longitude']},{pt['Latitude']}"
 
-        # NỐI LẠI ĐIỂM XUẤT PHÁT VÀO CUỐI LỘ TRÌNH (BẮT ĐẦU = KẾT THÚC)
         route_coords_str += f";{origin[1]},{origin[0]}"
 
-        # Lấy tuyến đường khép kín từ OSRM Route API
         route_url = f"http://router.project-osrm.org/route/v1/driving/{route_coords_str}?overview=full&geometries=geojson"
         route_res = requests.get(route_url, timeout=10).json()
         
@@ -206,9 +207,7 @@ def get_optimized_route_roundtrip(origin, points_list):
         
     return None, [], 0, 0
 
-# Khởi tạo dữ liệu
 df = load_data('QuanLyTĐ.xlsx')
-
 if df.empty:
     df = pd.DataFrame({
         'Tên đối tượng': ['Điểm A', 'Điểm B', 'Điểm C'],
@@ -225,7 +224,7 @@ if 'ordered_points' not in st.session_state:
 if 'route_summary' not in st.session_state:
     st.session_state.route_summary = None
 
-# ================= SIDEBAR =================
+# ================= SIDEBAR (TỐI ƯU KHOẢNG CÁCH GIAO DIỆN) =================
 with st.sidebar:
     st.markdown("<h2 class='robot-title'>🤖 Make By BangNC13</h2>", unsafe_allow_html=True)
     
@@ -239,7 +238,7 @@ with st.sidebar:
     
     st.divider()
     
-    st.markdown("<div class='hud-label'>📡 :</div>", unsafe_allow_html=True)
+    st.markdown("<div class='hud-label'>📡 Trạng thái định vị GPS:</div>", unsafe_allow_html=True)
     loc_data = get_geolocation()
     
     if loc_data and 'coords' in loc_data:
@@ -255,8 +254,7 @@ with st.sidebar:
     else:
         st.info("Bật GPS thiết bị để xác định điểm gốc.")
 
-    st.divider()
-
+    # Đã bỏ st.divider() thừa ở đây để nối thẳng nút bấm vào khung rada
     if st.button("⚡ Bấm xem lộ trình ⚡", use_container_width=True):
         if not st.session_state.current_loc:
             st.error("Chưa có tín hiệu GPS!")
@@ -285,12 +283,12 @@ with st.sidebar:
         <div class='hud-card'>
             <div class='hud-label'>Tổng quãng đường (Vòng kín)</div>
             <div class='hud-value'>{st.session_state.route_summary['distance']:.2f} KM</div>
-            <div class='hud-label' style='margin-top:8px;'>Thời gian di chuyển</div>
+            <div class='hud-label' style='margin-top:6px;'>Thời gian di chuyển</div>
             <div class='hud-value'>{st.session_state.route_summary['duration']:.0f} PHÚT</div>
         </div>
         """, unsafe_allow_html=True)
         
-        st.markdown("<br><b style='color:#ffffff;'>📍 Lộ trình thực thi:</b>", unsafe_allow_html=True)
+        st.markdown("<b style='color:#ffffff; display:block; margin-top:8px;'>📍 Lộ trình thực thi:</b>", unsafe_allow_html=True)
         st.markdown("<span style='color:#00f0ff;'>[0] Vị trí xuất phát (GPS CORE)</span>", unsafe_allow_html=True)
         for pt in st.session_state.ordered_points:
             st.markdown(f"<span style='color:#00f0ff;'>[{pt['Order']}]</span> <span style='color:#ffffff;'>{pt['Name']}</span>", unsafe_allow_html=True)
