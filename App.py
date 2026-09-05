@@ -7,7 +7,7 @@ import streamlit.components.v1 as components
 
 # 1. Cấu hình trang Streamlit
 st.set_page_config(
-    page_title="TQG - Tuyến đường thu cước",
+    page_title="TQG - Xác Định Vị Trí Đứt Cáp",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -351,7 +351,7 @@ if df is not None:
                 "radius": 4
             })
 
-    # Leaflet HTML - Chuẩn hóa toàn bộ ngoặc nhọn JS/CSS dạng {{ }}
+    # Leaflet HTML - Sử dụng Google Maps làm mặc định & đầy đủ Layer Menu
     polylines_json = json.dumps(polylines)
     markers_json = json.dumps(markers)
     break_marker_json = json.dumps(break_marker)
@@ -425,29 +425,41 @@ if df is not None:
         <div id="map"></div>
         <script>
             document.addEventListener("DOMContentLoaded", function() {{
-                var darkCarto = L.tileLayer('https://{{s}}.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
-                    maxZoom: 20, attribution: 'CartoDB Dark'
-                }});
+                // Danh sách Layer Google Maps & Dark Mode
                 var googleStreets = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}', {{
                     maxZoom: 20, attribution: 'Google Maps'
                 }});
-                var googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s,h&x={{x}}&y={{y}}&z={{z}}', {{
+                var googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={{x}}&y={{y}}&z={{z}}', {{
                     maxZoom: 20, attribution: 'Google Satellite'
                 }});
+                var googleHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={{x}}&y={{y}}&z={{z}}', {{
+                    maxZoom: 20, attribution: 'Google Hybrid'
+                }});
+                var googleTerrain = L.tileLayer('https://mt1.google.com/vt/lyrs=p&x={{x}}&y={{y}}&z={{z}}', {{
+                    maxZoom: 20, attribution: 'Google Terrain'
+                }});
+                var darkCarto = L.tileLayer('https://{{s}}.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
+                    maxZoom: 20, attribution: 'CartoDB Dark'
+                }});
 
+                // Khởi tạo bản đồ với mặc định là Google Streets
                 var map = L.map('map', {{
                     zoomControl: true,
                     attributionControl: false,
-                    layers: [darkCarto]
+                    layers: [googleStreets]
                 }}).setView({map_center_json}, {zoom_lvl});
 
+                // Cấu hình menu chuyển đổi Layer ở góc trên bên phải
                 var baseMaps = {{
-                    "🌙 Dark Mode": darkCarto,
                     "🗺️ Google Đường phố": googleStreets,
-                    "🛰️ Google Vệ tinh": googleSat
+                    "🛰️ Google Vệ tinh": googleSat,
+                    "🌐 Google Hybrid": googleHybrid,
+                    "⛰️ Google Địa hình": googleTerrain,
+                    "🌙 Dark Mode": darkCarto
                 }};
                 L.control.layers(baseMaps, null, {{ position: 'topright' }}).addTo(map);
 
+                // Vẽ Polylines
                 var polylinesData = {polylines_json};
                 polylinesData.forEach(function(item) {{
                     var line = L.polyline(item.coords, {{
@@ -456,6 +468,7 @@ if df is not None:
                     if (item.tooltip) line.bindTooltip(item.tooltip);
                 }});
 
+                // Vẽ Markers điểm KN
                 var markersData = {markers_json};
                 markersData.forEach(function(item) {{
                     var circle = L.circleMarker(item.coords, {{
@@ -465,6 +478,7 @@ if df is not None:
                     if (item.tooltip) circle.bindTooltip(item.tooltip);
                 }});
 
+                // Vẽ Marker vị trí đứt cáp
                 var breakMarkerData = {break_marker_json};
                 if (breakMarkerData) {{
                     var breakIcon = L.divIcon({{ className: 'custom-break-icon' }});
@@ -473,6 +487,7 @@ if df is not None:
                     if (breakMarkerData.tooltip) bMarker.bindTooltip(breakMarkerData.tooltip);
                 }}
 
+                // Xử lý GPS Vị trí hiện tại của người dùng
                 var userMarker = null;
                 var accuracyCircle = null;
 
@@ -507,6 +522,7 @@ if df is not None:
                     }});
                 }}
 
+                // Nút bấm định vị vị trí hiện tại
                 var locateControl = L.Control.extend({{
                     options: {{ position: 'topleft' }},
                     onAdd: function (map) {{
