@@ -4,7 +4,6 @@ import requests
 import folium
 import streamlit.components.v1 as components
 from streamlit_folium import st_folium
-from streamlit_js_eval import get_geolocation
 
 # 1. Cấu hình trang Full-Width
 st.set_page_config(
@@ -38,7 +37,6 @@ st.markdown("""
         box-shadow: 5px 0px 15px rgba(255, 102, 0, 0.4) !important;
     }
 
-    /* TRONG SUỐT THANH HEADER TÊN CÙNG */
     header[data-testid="stHeader"] {
         background-color: transparent !important;
         background: transparent !important;
@@ -49,7 +47,6 @@ st.markdown("""
         fill: #ffffff !important;
     }
 
-    /* ================= TRONG SUỐT KHU VỰC BẢN ĐỒ VÀ PHẦN DƯỚI BẢN ĐỒ ================= */
     iframe {
         background-color: transparent !important;
     }
@@ -287,6 +284,15 @@ if 'ordered_points' not in st.session_state:
 if 'route_summary' not in st.session_state:
     st.session_state.route_summary = None
 
+# Bắt tọa độ Realtime gửi về từ Component JS
+realtime_lat = st.query_params.get("lat")
+realtime_lon = st.query_params.get("lon")
+if realtime_lat and realtime_lon:
+    try:
+        st.session_state.current_loc = (float(realtime_lat), float(realtime_lon))
+    except ValueError:
+        pass
+
 # ================= SIDEBAR =================
 with st.sidebar:
     st.markdown("<h2 class='robot-title'>🤖 Make By BangNC13</h2>", unsafe_allow_html=True)
@@ -301,21 +307,18 @@ with st.sidebar:
     
     st.divider()
     
-    st.markdown("<div class='hud-label'>📡 Trạng thái định vị GPS:</div>", unsafe_allow_html=True)
-    loc_data = get_geolocation()
+    st.markdown("<div class='hud-label'>📡 Trạng thái định vị GPS REALTIME:</div>", unsafe_allow_html=True)
     
-    if loc_data and 'coords' in loc_data:
-        lat = loc_data['coords']['latitude']
-        lon = loc_data['coords']['longitude']
-        st.session_state.current_loc = (lat, lon)
+    if st.session_state.current_loc:
+        lat, lon = st.session_state.current_loc
         st.markdown(f"""
         <div class='hud-card'>
-            <div class='hud-label'>Tọa độ hiện tại</div>
-            <div class='hud-value'>{lat:.4f}, {lon:.4f}</div>
+            <div class='hud-label'>Tọa độ Realtime</div>
+            <div class='hud-value'>{lat:.5f}, {lon:.5f}</div>
         </div>
         """, unsafe_allow_html=True)
     else:
-        st.info("Bật GPS thiết bị để xác định điểm gốc.")
+        st.info("Đang kết nối tín hiệu GPS Realtime...")
 
     st.divider()
 
@@ -366,7 +369,7 @@ else:
 
 m = folium.Map(
     location=map_center, 
-    zoom_start=14, 
+    zoom_start=15, 
     tiles=None,
     zoom_control=False
 )
@@ -388,8 +391,8 @@ folium.TileLayer(
 if st.session_state.current_loc:
     folium.Marker(
         location=st.session_state.current_loc,
-        popup="<b>Vị trí xuất phát & Kết thúc (GPS CORE)</b>",
-        tooltip="GPS ORIGIN & END",
+        popup="<b>Vị trí GPS Realtime của bạn</b>",
+        tooltip="REALTIME GPS POSITION",
         icon=folium.Icon(color='red', icon='crosshairs', prefix='fa')
     ).add_to(m)
 
@@ -450,15 +453,15 @@ m.get_root().html.add_child(map_click_js)
 
 st_folium(m, use_container_width=True, height=1000)
 
-# LẮNG NGHE TÍN HIỆU TỪ MAP VÀ KÍCH HOẠT NÚT COLLAPSE SIDEBAR
+# LẮNG NGHE TÍN HIỆU CẬP NHẬT TỰ ĐỘNG SIDEBAR & GPS REALTIME TRACKING
 components.html("""
 <script>
+    // 1. Thu gọn Sidebar khi chạm vào bản đồ
     window.addEventListener('message', function(event) {
         if (event.data && event.data.type === 'CLOSE_STREAMLIT_SIDEBAR') {
             const parentDoc = window.parent.document;
             const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
             
-            // Kiểm tra xem Sidebar có đang mở không
             if (sidebar && sidebar.getAttribute('aria-expanded') === 'true') {
                 const collapseBtn = parentDoc.querySelector('[data-testid="stSidebarCollapseButton"] button');
                 if (collapseBtn) {
@@ -467,5 +470,38 @@ components.html("""
             }
         }
     });
+
+    // 2. Realtime GPS Tracking qua watchPosition
+    let lastLat = null;
+    let lastLon = null;
+
+    if ("geolocation" in navigator) {
+        navigator.geolocation.watchPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                
+                // Chỉ cập nhật URL param khi người dùng di chuyển > ~3-5m để tránh reload liên tục
+                if (!lastLat || Math.abs(lat - lastLat) > 0.00005 || Math.abs(lon - lastLon) > 0.00005) {
+                    lastLat = lat;
+                    lastLon = lon;
+                    
+                    const parentWindow = window.parent;
+                    const currentUrl = new URL(parentWindow.location.href);
+                    currentUrl.searchParams.set('lat', lat);
+                    currentUrl.searchParams.set('lon', lon);
+                    parentWindow.history.replaceState({}, '', currentUrl);
+                }
+            },
+            (error) => {
+                console.error("Lỗi lấy tọa độ GPS Realtime:", error);
+            },
+            {
+                enableHighAccuracy: true,
+                maximumAge: 1000,
+                timeout: 5000
+            }
+        );
+    }
 </script>
 """, height=0, width=0)
