@@ -13,13 +13,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Inject CSS Custom: Robotic Theme & Layout Full Edge
+# 2. Inject CSS Custom: Theme Nền Cam Robotic & Layout Full Edge
 st.markdown("""
 <style>
     /* Nhập font Cyberpunk / Sci-Fi */
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
 
-    /* Bỏ hoàn toàn Padding khu vực Main Content để Map tràn viền */
+    /* Bỏ hoàn toàn Padding khu vực Main Content */
     .block-container {
         padding-top: 0rem !important;
         padding-bottom: 0rem !important;
@@ -28,19 +28,24 @@ st.markdown("""
         max-width: 100% !important;
     }
 
-    /* Ép tất cả các văn bản thường trong ứng dụng thành màu TRẮNG */
+    /* Đổi nền chính toàn ứng dụng sang màu Cam Tối / Cam Cyberpunk */
+    .stApp {
+        background-color: #1a0a00 !important;
+    }
+
+    /* Ép tất cả văn bản thường thành màu TRẮNG */
     html, body, [class*="css"], .stMarkdown, p, span, label, div {
         color: #ffffff !important;
     }
 
-    /* Tối ưu nền Sidebar dạng Dark Robotic */
+    /* Tối ưu nền Sidebar dạng Dark Orange Robotic Gradient */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0a0e17 0%, #121929 100%);
-        border-right: 2px solid #00f0ff;
-        box-shadow: 5px 0px 15px rgba(0, 240, 255, 0.2);
+        background: linear-gradient(180deg, #331400 0%, #1f0c00 100%) !important;
+        border-right: 2px solid #ff6600 !important;
+        box-shadow: 5px 0px 15px rgba(255, 102, 0, 0.4) !important;
     }
 
-    /* Style Tiêu đề Sidebar - Giữ màu Cyan Neon */
+    /* Style Tiêu đề Sidebar - Giữ màu Cyan Neon nổi bật trên nền cam */
     .robot-title {
         font-family: 'Orbitron', sans-serif;
         color: #00f0ff !important;
@@ -74,19 +79,19 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    /* Container hiển thị thông số dạng HUD display */
+    /* Container hiển thị thông số dạng HUD display - Nền Cam Đen */
     .hud-card {
-        background: rgba(16, 26, 44, 0.85);
-        border: 1px solid #00f0ff;
-        border-left: 4px solid #7000ff;
+        background: rgba(51, 20, 0, 0.85) !important;
+        border: 1px solid #ff6600 !important;
+        border-left: 4px solid #00f0ff !important;
         border-radius: 6px;
         padding: 12px;
         margin-top: 10px;
-        box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.1);
+        box-shadow: inset 0 0 10px rgba(255, 102, 0, 0.2);
         font-family: 'Rajdhani', sans-serif;
     }
 
-    /* Đổi nhãn chữ thường từ xám nhạt sang TRẮNG */
+    /* Nhãn chữ thường - Màu TRẮNG */
     .hud-label {
         color: #ffffff !important;
         font-size: 0.85rem;
@@ -101,10 +106,10 @@ st.markdown("""
         font-family: 'Orbitron', sans-serif;
     }
 
-    /* Divider phong cách Laser line - Giữ màu Neon */
+    /* Divider phong cách Laser line Cam Neon */
     hr {
-        border-color: #00f0ff !important;
-        opacity: 0.3;
+        border-color: #ff6600 !important;
+        opacity: 0.5;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -211,7 +216,7 @@ with st.sidebar:
 
     st.divider()
 
-    # 3. Nút kích hoạt lộ trình phong cách Robotic
+    # 3. Nút kích hoạt lộ trình
     if st.button("⚡ Bấm xem lộ trình ⚡", use_container_width=True):
         if not st.session_state.current_loc:
             st.error("Chưa có tín hiệu GPS!")
@@ -248,7 +253,6 @@ with st.sidebar:
         
         st.markdown("<br><b style='color:#ffffff;'>📍 Lộ trình thực thi:</b>", unsafe_allow_html=True)
         for pt in st.session_state.ordered_points:
-            # Mã số màu Neon Cyan (#00f0ff), Tên điểm màu Trắng (#ffffff)
             st.markdown(f"<span style='color:#00f0ff;'>[{pt['Order']}]</span> <span style='color:#ffffff;'>{pt['Name']}</span>", unsafe_allow_html=True)
 
 # ================= HIỂN THỊ BẢN ĐỒ FULL CẠNH VIỀN (MAIN CONTENT) =================
@@ -259,7 +263,7 @@ else:
 
 m = folium.Map(location=map_center, zoom_start=15, tiles=None)
 
-# Neon Dark Tile / Standard Satellite layer
+# Google Maps Tile Layers
 folium.TileLayer(
     tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
     attr='Google Maps',
@@ -274,7 +278,7 @@ folium.TileLayer(
     overlay=False
 ).add_to(m)
 
-# 1. Đánh dấu GPS xuất phát (Icon Robotic)
+# 1. Đánh dấu GPS xuất phát
 if st.session_state.current_loc:
     folium.Marker(
         location=st.session_state.current_loc,
@@ -283,7 +287,7 @@ if st.session_state.current_loc:
         icon=folium.Icon(color='red', icon='crosshairs', prefix='fa')
     ).add_to(m)
 
-# 2. Điểm ghé thăm phong cách Cyber Matrix Marker (Giữ nguyên Gradient Neon)
+# 2. Điểm ghé thăm Cyber Matrix Marker
 if st.session_state.ordered_points:
     for pt in st.session_state.ordered_points:
         folium.Marker(
@@ -308,7 +312,7 @@ if st.session_state.ordered_points:
             )
         ).add_to(m)
 
-# 3. Polyline Cyber Neon (Giữ nguyên đường đi màu Cyan Neon)
+# 3. Polyline Cyber Neon
 if st.session_state.route_coords:
     folium.PolyLine(
         st.session_state.route_coords,
@@ -320,5 +324,5 @@ if st.session_state.route_coords:
 
 folium.LayerControl().add_to(m)
 
-# Render Map 100% VH (Tràn toàn bộ màn hình còn lại trừ Sidebar)
+# Render Map 100% VH
 st_folium(m, width="100%", height=920)
