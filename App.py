@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import folium
 from streamlit_folium import st_folium
+from streamlit_js_eval import get_geolocation
 
 # Cấu hình trang
 st.set_page_config(
@@ -18,32 +19,19 @@ st.title("🗺️ Quản lý Tập điểm & Chỉ đường Xe máy")
 def load_data(file_path):
     try:
         df = pd.read_excel(file_path)
-        # Loại bỏ các dòng bị thiếu tọa độ
         df = df.dropna(subset=['Latitude', 'Longitude'])
         return df
     except Exception as e:
         st.error(f"Không thể đọc file {file_path}: {e}")
         return pd.DataFrame()
 
-# 2. Hàm lấy vị trí hiện tại dựa trên IP
-def get_current_location_by_ip():
-    try:
-        res = requests.get('https://ipinfo.io/json', timeout=5).json()
-        if 'loc' in res:
-            lat, lon = map(float, res['loc'].split(','))
-            return lat, lon
-    except Exception:
-        pass
-    return None
-
-# 3. Hàm lấy lộ trình từ OSRM API (đường đi xe máy / ô tô)
+# 2. Hàm lấy lộ trình từ OSRM API (đường đi xe máy / ô tô)
 def get_osrm_route(origin, destination):
     url = f"http://router.project-osrm.org/route/v1/driving/{origin[1]},{origin[0]};{destination[1]},{destination[0]}?overview=full&geometries=geojson"
     try:
         res = requests.get(url, timeout=5).json()
         if res.get('code') == 'Ok':
             coords = res['routes'][0]['geometry']['coordinates']
-            # Chuyển đổi [lon, lat] từ OSRM thành [lat, lon] cho Folium
             return [(lat, lon) for lon, lat in coords]
     except Exception as e:
         st.error(f"Lỗi khi tính toán lộ trình: {e}")
@@ -56,7 +44,7 @@ if df.empty:
     st.warning("Không tìm thấy dữ liệu tập điểm hợp lệ từ QuanLyTĐ.xlsx.")
     st.stop()
 
-# Khởi tạo trạng thái lưu dữ liệu
+# Khởi tạo trạng thái dữ liệu trong Session State
 if 'current_loc' not in st.session_state:
     st.session_state.current_loc = None
 
@@ -80,27 +68,24 @@ with st.sidebar:
     
     st.divider()
     
-    # 2. Nút bấm nhận vị trí hiện tại
-    if st.button("📍 Lấy vị trí hiện tại", use_container_width=True):
-        loc = get_current_location_by_ip()
-        if loc:
-            st.session_state.current_loc = loc
-            st.success(f"Vị trí: {loc[0]:.5f}, {loc[1]:.5f}")
-        else:
-            default_lat = df['Latitude'].mean()
-            default_lon = df['Longitude'].mean()
-            st.session_state.current_loc = (default_lat, default_lon)
-            st.warning("Không định vị được IP, sử dụng tọa độ trung tâm mặc định.")
-
-    if st.session_state.current_loc:
-        st.info(f"Vị trí xuất phát: {st.session_state.current_loc[0]:.5f}, {st.session_state.current_loc[1]:.5f}")
+    # 2. Lấy vị trí GPS chính xác từ thiết bị
+    st.subheader("📍 Định vị GPS")
+    loc_data = get_geolocation()
+    
+    if loc_data and 'coords' in loc_data:
+        lat = loc_data['coords']['latitude']
+        lon = loc_data['coords']['longitude']
+        st.session_state.current_loc = (lat, lon)
+        st.success(f"GPS thiết bị: {lat:.5f}, {lon:.5f}")
+    else:
+        st.info("Vui lòng cấp quyền truy cập Vị trí (Location) trên điện thoại / trình duyệt.")
 
     st.divider()
 
     # 3. Nút "Bấm" tính toán lộ trình
     if st.button("🚀 Bấm", type="primary", use_container_width=True):
         if not st.session_state.current_loc:
-            st.error("Vui lòng nhấn nút 'Lấy vị trí hiện tại' trước!")
+            st.error("Chưa nhận diện được vị trí GPS! Hãy kiểm tra quyền vị trí trên thiết bị.")
         elif not selected_names:
             st.error("Vui lòng chọn ít nhất 1 tập điểm trong danh sách!")
         else:
@@ -108,7 +93,7 @@ with st.sidebar:
             st.session_state.selected_points_data = selected_df.to_dict('records')
             
             dest = (selected_df.iloc[0]['Latitude'], selected_df.iloc[0]['Longitude'])
-            with st.spinner("Đang vẽ lộ trình di chuyển..."):
+            with st.spinner("Đang tìm lộ trình di chuyển tối ưu..."):
                 st.session_state.route_coords = get_osrm_route(st.session_state.current_loc, dest)
             st.success("Đã tìm xong lộ trình!")
 
@@ -118,7 +103,7 @@ if st.session_state.current_loc:
 else:
     map_center = [df['Latitude'].mean(), df['Longitude'].mean()]
 
-m = folium.Map(location=map_center, zoom_start=14)
+m = folium.Map(location=map_center, zoom_start=15)
 
 # Layer Google Maps Đường Phố
 folium.TileLayer(
@@ -138,16 +123,16 @@ folium.TileLayer(
     control=True
 ).add_to(m)
 
-# Đánh dấu vị trí hiện tại (Đỏ)
+# Đánh dấu vị trí hiện tại GPS (Màu đỏ)
 if st.session_state.current_loc:
     folium.Marker(
         location=st.session_state.current_loc,
-        popup="<b>Vị trí xuất phát</b>",
-        tooltip="Vị trí của bạn",
+        popup="<b>Vị trí GPS của bạn</b>",
+        tooltip="Vị trí thiết bị hiện tại",
         icon=folium.Icon(color='red', icon='user', prefix='fa')
     ).add_to(m)
 
-# Đánh dấu tập điểm chọn (Xanh)
+# Đánh dấu các tập điểm được chọn (Màu xanh lá)
 if st.session_state.selected_points_data:
     for pt in st.session_state.selected_points_data:
         folium.Marker(
@@ -157,7 +142,7 @@ if st.session_state.selected_points_data:
             icon=folium.Icon(color='green', icon='flag')
         ).add_to(m)
 
-# Vẽ tuyến đường di chuyển (Xanh lam)
+# Vẽ tuyến đường di chuyển xe máy (Màu xanh lam)
 if st.session_state.route_coords:
     folium.PolyLine(
         st.session_state.route_coords,
@@ -169,5 +154,5 @@ if st.session_state.route_coords:
 
 folium.LayerControl().add_to(m)
 
-# Render bản đồ lên Web
+# Render bản đồ lên giao diện Web
 st_folium(m, width="100%", height=650)
