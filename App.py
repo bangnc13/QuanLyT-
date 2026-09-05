@@ -37,6 +37,21 @@ st.markdown("""
         box-shadow: 5px 0px 15px rgba(255, 102, 0, 0.4) !important;
     }
 
+    /* ================= TRONG SUỐT THANH HEADER TÊN CÙNG (CHỨA NÚT SHARE) ================= */
+    header[data-testid="stHeader"] {
+        background-color: transparent !important;
+        background: transparent !important;
+    }
+
+    /* Đổi màu biểu tượng và chữ "Share" sang màu trắng cho nổi bật trên nền tối */
+    header[data-testid="stHeader"] * {
+        color: #ffffff !important;
+        fill: #ffffff !important;
+    }
+
+    /* (LƯU Ý): Nếu muốn ẨN HOÀN TOÀN thanh Share này, bạn chỉ cần bỏ ghi chú dòng bên dưới: */
+    /* header[data-testid="stHeader"] { display: none !important; } */
+
     .robot-title {
         font-family: 'Orbitron', sans-serif;
         color: #00f0ff !important;
@@ -135,7 +150,7 @@ st.markdown("""
         background-color: rgba(0, 240, 255, 0.2) !important;
     }
 
-    /* NÚT COLLAPSE/EXPAND SIDEBAR NEON XANH */
+    /* ================= NÚT COLLAPSE/EXPAND SIDEBAR NEON XANH ================= */
     [data-testid="stSidebarCollapseButton"] button,
     [data-testid="stSidebarExpandButton"] button {
         background-color: #1f0c00 !important;
@@ -242,7 +257,7 @@ def get_optimized_route_roundtrip(origin, points_list):
 
         # Tạo danh sách các điểm ghé thăm
         ordered_points = []
-        route_coords_str = f"{origin[1]},{origin[0]}"
+        route_coords_str = f"{origin[1]},{origin[0]}" # Xuất phát từ Điểm Bắt Đầu
         
         for order, idx in enumerate(ordered_indices, 1):
             pt = all_points[idx]
@@ -254,7 +269,7 @@ def get_optimized_route_roundtrip(origin, points_list):
             })
             route_coords_str += f";{pt['Longitude']},{pt['Latitude']}"
 
-        # NỐI LẠI ĐIỂM XUẤT PHÁT VÀO CUỐI LỘ TRÌNH
+        # NỐI LẠI ĐIỂM XUẤT PHÁT VÀO CUỐI LỘ TRÌNH (BẮT ĐẦU = KẾT THÚC)
         route_coords_str += f";{origin[1]},{origin[0]}"
 
         # Lấy tuyến đường khép kín từ OSRM Route API
