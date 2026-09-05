@@ -5,8 +5,8 @@ import folium
 from streamlit_folium import st_folium
 import urllib.parse
 
-# 1. Cấu hình trang & CSS Giao diện Clean Modern
-st.set_page_config(layout="wide", page_title="TQG - ĐIỀU HÀNH LỘ TRÌNH", initial_sidebar_state="expanded")
+# 1. Cấu hình trang & CSS Giao diện Clean Light
+st.set_page_config(layout="wide", page_title="TQG - XÁC ĐỊNH VỊ TRÍ DỨT CÁP", initial_sidebar_state="expanded")
 
 st.markdown("""
     <style>
@@ -17,19 +17,19 @@ st.markdown("""
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
         .block-container {
-            padding: 0rem !important;
+            padding: 0.5rem 0.5rem 0rem 0.5rem !important;
         }
         header {visibility: hidden;}
 
-        /* Custom Nút Ẩn/Hiện Sidebar ở góc trên */
-        button[data-testid="baseButton-headerNoPadding"] {
+        /* Nút toggle Sidebar mặc định của Streamlit */
+        button[data-testid="baseButton-header"] {
             background-color: #ffffff !important;
             border: 1px solid #dcdfe6 !important;
             border-radius: 6px !important;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.08) !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1) !important;
             position: fixed !important;
-            top: 12px !important;
-            left: 12px !important;
+            top: 10px !important;
+            left: 10px !important;
             z-index: 999999 !important;
         }
 
@@ -40,51 +40,37 @@ st.markdown("""
             padding-top: 1rem;
         }
 
-        /* Custom Card container trong Sidebar */
-        .sidebar-card {
-            background-color: #ffffff;
-            border: 1px solid #e1e4e8;
-            border-radius: 8px;
-            padding: 12px 15px;
-            margin-bottom: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-
         .card-title {
             font-size: 11px;
             font-weight: 700;
             color: #6c757d;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
-        /* Nút bấm đẹp phong cách Flat UI */
+        /* Nút bấm Custom */
         .btn-danger {
             width: 100%;
             background-color: #ff4d4f;
             color: white;
             border: none;
             padding: 8px;
-            border-radius: 6px;
+            border-radius: 4px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
         }
-        .btn-danger:hover { background-color: #ff7875; }
 
         .btn-secondary {
             width: 100%;
-            background-color: #f0f2f5;
-            color: #434343;
-            border: 1px solid #d9d9d9;
+            background-color: #e0e0e0;
+            color: #333;
+            border: none;
             padding: 8px;
-            border-radius: 6px;
+            border-radius: 4px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
         }
-        .btn-secondary:hover { background-color: #e6e8eb; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -130,10 +116,10 @@ def solve_tsp(selected_df):
         
     return path, total_dist
 
-# 4. Thanh Menu bên cạnh (Sidebar) Thiết kế Mới
+# 4. Thanh Menu bên cạnh (Sidebar) Ban đầu
 with st.sidebar:
     st.markdown("""
-        <div style="margin-bottom: 15px; padding-left: 5px;">
+        <div style="margin-bottom: 12px;">
             <div style="color: #27ae60; font-size: 16px; font-weight: bold;">⚡ TQG-XÁC ĐỊNH VỊ TRÍ DỨT CÁP</div>
             <div style="color: #2ab7ca; font-size: 11px; font-weight: 500;">Make by BangNC13</div>
         </div>
@@ -141,19 +127,19 @@ with st.sidebar:
     
     all_objects = df['Tên đối tượng'].tolist()
     
-    # Card 1: Chọn tập điểm dừng
-    st.markdown('<div class="card-title">📍 LỌC DỮ LIỆU POP / TẬP ĐIỂM</div>', unsafe_allow_html=True)
+    # Lọc dữ liệu POP
+    st.markdown('<div class="card-title">LỌC DỮ LIỆU POP</div>', unsafe_allow_html=True)
     selected_names = st.multiselect(
-        "Danh sách điểm chọn:",
+        "Chọn danh sách tập điểm:",
         options=all_objects,
         default=all_objects[:10] if len(all_objects) >= 10 else all_objects[:2],
         label_visibility="collapsed"
     )
     
-    st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #e1e4e8;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 12px 0; border: none; border-top: 1px solid #e1e4e8;'>", unsafe_allow_html=True)
     
-    # Card 2: Thông tin đo OTDR
-    st.markdown('<div class="card-title">📐 THÔNG TIN ĐO (OTDR)</div>', unsafe_allow_html=True)
+    # Thông tin đo OTDR
+    st.markdown('<div class="card-title">📍 THÔNG TIN ĐO (OTDR)</div>', unsafe_allow_html=True)
     
     st.caption("Điểm đo (Đang đứng)")
     start_node_name = st.selectbox("Start Node", options=selected_names if selected_names else all_objects, label_visibility="collapsed")
@@ -164,16 +150,15 @@ with st.sidebar:
     st.caption("Chiều dài đo được (Mét)")
     measure_dist = st.number_input("Dist", value=170.00, step=10.0, format="%.2f", label_visibility="collapsed")
     
-    # Action Buttons
     col1, col2 = st.columns(2)
     with col1:
         st.markdown('<button class="btn-danger">📌 Xác định</button>', unsafe_allow_html=True)
     with col2:
         st.markdown('<button class="btn-secondary">🗑️ Xóa</button>', unsafe_allow_html=True)
 
-# 5. Xử lý bản đồ
+# 5. Hiển thị Bản đồ
 if len(selected_names) < 2:
-    st.warning("Vui lòng tích chọn ít nhất 2 điểm dừng trong Menu bên cạnh.")
+    st.warning("Vui lòng chọn ít nhất 2 điểm dừng trong Menu bên cạnh.")
 else:
     selected_df = df[df['Tên đối tượng'].isin(selected_names)].reset_index(drop=True)
     path_indices, total_km = solve_tsp(selected_df)
@@ -182,7 +167,6 @@ else:
     center_lat = ordered_df['Latitude'].mean()
     center_lon = ordered_df['Longitude'].mean()
 
-    # Tạo Map
     m = folium.Map(
         location=[center_lat, center_lon], 
         zoom_start=13,
@@ -198,7 +182,7 @@ else:
         </script>
     '''))
 
-    # Nút bấm góc trên trái (GPS của tôi & Chỉ đường)
+    # Nút bấm góc trên trái (GPS của tôi & Chỉ đường) - Thắt chặt lề trái 60px để không che nút Hamburger Menu
     first_target_lat = ordered_df.iloc[0]['Latitude']
     first_target_lon = ordered_df.iloc[0]['Longitude']
     direct_gmaps_url = f"https://www.google.com/maps/dir/?api=1&destination={first_target_lat},{first_target_lon}"
@@ -206,24 +190,24 @@ else:
     top_buttons_html = f'''
     <div style="
         position: fixed; 
-        top: 15px; 
+        top: 12px; 
         left: 60px; 
         z-index: 9999; 
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 6px;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     ">
         <button onclick="locateUser()" style="
             background: #ffffff;
             color: #333333;
             border: 1px solid #cccccc;
-            padding: 6px 14px;
-            border-radius: 6px;
+            padding: 6px 12px;
+            border-radius: 4px;
             font-size: 13px;
-            font-weight: 600;
+            font-weight: bold;
             cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
             display: flex;
             align-items: center;
             gap: 6px;
@@ -235,17 +219,17 @@ else:
             background: #00b894;
             color: #ffffff;
             border: none;
-            padding: 8px 14px;
-            border-radius: 6px;
+            padding: 7px 12px;
+            border-radius: 4px;
             font-size: 13px;
-            font-weight: 600;
+            font-weight: bold;
             text-decoration: none;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
             display: flex;
             align-items: center;
             gap: 6px;
         ">
-            🚗 Di chuyển thôi
+            🛣️ Chỉ đường tới điểm sự cố
         </a>
     </div>
 
@@ -264,7 +248,7 @@ else:
                         fillOpacity: 0.9
                     }}).addTo(map).bindPopup("📍 Vị trí hiện tại của bạn").openPopup();
                 }}, function() {{
-                    alert("Không thể lấy vị trí GPS từ thiết bị.");
+                    alert("Không thể truy cập GPS vị trí của bạn.");
                 }});
             }}
         }}
@@ -272,7 +256,7 @@ else:
     '''
     m.get_root().html.add_child(folium.Element(top_buttons_html))
 
-    # Vẽ đường liên kết các điểm mốc
+    # Vẽ tuyến đường
     route_coords = ordered_df[['Latitude', 'Longitude']].values.tolist()
     folium.PolyLine(
         route_coords, 
@@ -281,7 +265,7 @@ else:
         opacity=0.8
     ).add_to(m)
 
-    # Marker các điểm mốc
+    # Marker điểm dừng
     for idx, row in ordered_df.iterrows():
         seq_num = idx + 1
         
@@ -310,4 +294,4 @@ else:
         ).add_to(m)
 
     # Hiển thị bản đồ tràn màn hình
-    st_folium(m, width="100%", height=880, returned_objects=[])
+    st_folium(m, width="100%", height=850, returned_objects=[])
