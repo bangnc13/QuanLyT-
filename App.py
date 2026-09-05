@@ -7,7 +7,7 @@ from streamlit_folium import st_folium
 from streamlit_js_eval import get_geolocation
 
 # 1. Cấu hình giao diện
-st.set_page_config(layout="wide", page_title="TQG - Tuyến đường", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", page_title="TQG - Tuyến đường thu cước ", initial_sidebar_state="expanded")
 
 st.markdown("""
     <style>
