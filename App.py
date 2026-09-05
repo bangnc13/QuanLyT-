@@ -1,304 +1,555 @@
-import streamlit as st
+import os
+import json
 import pandas as pd
-import numpy as np
-import folium
-import requests
-from streamlit_folium import st_folium
+import networkx as nx
+import streamlit as st
+import streamlit.components.v1 as components
 
-# 1. Cấu hình giao diện & CSS Custom
-st.set_page_config(layout="wide", page_title="TQG - Tuyến đường", initial_sidebar_state="expanded")
+# 1. Cấu hình trang Streamlit
+st.set_page_config(
+    page_title="TQG - Xác Định Vị Trí Đứt Cáp",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
+# CSS Tùy chỉnh Dark Theme toàn bộ App & Sidebar
 st.markdown("""
     <style>
-        .stApp { background-color: #f8f9fa; }
-        .block-container { padding: 0rem !important; }
-        
-        [data-testid="stSidebarCollapseButton"] {
-            background-color: #ffffff !important;
-            border: 1px solid #dcdfe6 !important;
-            border-radius: 4px !important;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important;
-            color: #333333 !important;
+        html, body, [data-testid="stAppViewContainer"], .main, .stApp {
+            margin: 0 !important;
+            padding: 0 !important;
+            height: 100vh !important;
+            overflow: hidden !important;
+            background-color: #0E1117 !important;
+            color: #E2E8F0 !important;
+        }
+
+        /* Sidebar Dark Mode */
+        section[data-testid="stSidebar"] {
+            background-color: #1E293B !important;
+            z-index: 999999 !important;
+            border-right: 1px solid #334155 !important;
+        }
+        section[data-testid="stSidebar"] > div:first-child {
+            padding-top: 1rem !important;
+            padding-left: 0.8rem !important;
+            padding-right: 0.8rem !important;
+        }
+
+        .sidebar-title {
+            font-size: 1.2rem !important;
+            font-weight: 800 !important;
+            color: #38BDF8 !important;
+            margin-bottom: 2px !important;
+        }
+        .sidebar-subtitle {
+            font-size: 0.75rem !important;
+            color: #94A3B8 !important;
+            margin-bottom: 10px !important;
+        }
+
+        header[data-testid="stHeader"] {
+            background: transparent !important;
+            height: 0px !important;
             z-index: 999999 !important;
         }
 
-        section[data-testid="stSidebar"] {
-            background-color: #f0f2f5 !important;
-            border-right: 1px solid #dcdfe6 !important;
-            min-width: 300px !important;
-            max-width: 340px !important;
-            padding-top: 1rem;
+        .main .block-container, 
+        [data-testid="stMainBlockContainer"],
+        [data-testid="stVerticalBlock"],
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            padding: 0 !important;
+            margin: 0 !important;
+            gap: 0rem !important;
+            max-width: 100vw !important;
+            height: 100vh !important;
+        }
+
+        iframe {
+            width: 100vw !important;
+            height: 100vh !important;
+            border: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            display: block !important;
         }
         
-        div.stButton > button {
-            width: 100%;
-            border-radius: 6px;
-            font-weight: bold;
-            border: none;
-            padding: 10px 16px;
-            margin-top: 5px;
+        /* Dark Theme cho Input / Selectbox */
+        div[data-baseweb="select"] > div {
+            background-color: #0F172A !important;
+            color: #F8FAFC !important;
+            border-color: #334155 !important;
+        }
+        input {
+            background-color: #0F172A !important;
+            color: #F8FAFC !important;
         }
     </style>
 """, unsafe_allow_html=True)
 
-# 2. Nạp dữ liệu Excel
+# Khởi tạo session state
+if "break_result" not in st.session_state:
+    st.session_state.break_result = None
+if "break_gps" not in st.session_state:
+    st.session_state.break_gps = None
+if "selected_pops" not in st.session_state:
+    st.session_state.selected_pops = []
+
 @st.cache_data
-def load_data():
-    df = pd.read_excel('QuanLyTĐ.xlsx', sheet_name='TĐ')
-    df = df.dropna(subset=['Latitude', 'Longitude']).reset_index(drop=True)
-    return df
-
-try:
-    df = load_data()
-except Exception as e:
-    st.error(f"[SYSTEM ERROR]: Không thể nạp dữ liệu: {e}")
-    st.stop()
-
-# 3. Thuật toán OSRM tính lộ trình thực tế
-def get_osrm_route(coords_list):
-    loc_str = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
-    url = f"http://router.project-osrm.org/route/v1/driving/{loc_str}?overview=full&geometries=geojson"
-    try:
-        res = requests.get(url, timeout=3)
-        data = res.json()
-        if data.get("code") == "Ok":
-            route_geometry = data["routes"][0]["geometry"]["coordinates"]
-            return [[lat, lon] for lon, lat in route_geometry]
-    except Exception:
-        pass
-    return coords_list
-
-# 4. Thuật toán TSP tìm lộ trình tối ưu xuất phát từ GPS của bạn
-def haversine_matrix(coords):
-    rads = np.radians(coords)
-    lats, lons = rads[:, 0], rads[:, 1]
-    dlat = lats[:, None] - lats[None, :]
-    dlon = lons[:, None] - lons[None, :]
-    a = np.sin(dlat / 2.0)**2 + np.cos(lats[:, None]) * np.cos(lats[None, :]) * np.sin(dlon / 2.0)**2
-    return 6371 * 2 * np.arcsin(np.sqrt(a))
-
-def solve_tsp_from_start(selected_df):
-    coords = selected_df[['Latitude', 'Longitude']].values
-    dist_mat = haversine_matrix(coords)
-    num_pts = len(coords)
+def load_server_data():
+    possible_files = [
+        "Danh-Sách-Đoạn-Cáp.xlsx", 
+        "Danh_Sach_Doan_Cap.xlsx", 
+        "data.xlsx", 
+        "Danh-Sách-Đoạn-Cáp.xls"
+    ]
     
-    unvisited = set(range(1, num_pts))
-    current = 0
-    path = [current]
+    selected_file = None
+    for f in possible_files:
+        if os.path.exists(f):
+            selected_file = f
+            break
+
+    if not selected_file:
+        files = [f for f in os.listdir(".") if f.endswith(".xlsx") or f.endswith(".xls")]
+        if files:
+            selected_file = files[0]
+
+    if selected_file:
+        df = pd.read_excel(selected_file)
+        return df, selected_file
+    return None, None
+
+df, file_name = load_server_data()
+
+st.sidebar.markdown('<div class="sidebar-title">⚡ TQG - Tuyến Đường</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="sidebar-subtitle">Voice by BangNC13 - FPT Telecom System</div>', unsafe_allow_html=True)
+
+if df is not None:
+    df.columns = [str(col).strip() for col in df.columns]
     
-    while unvisited:
-        next_pt = min(unvisited, key=lambda x: dist_mat[current][x])
-        path.append(next_pt)
-        unvisited.remove(next_pt)
-        current = next_pt
+    lat_col1 = next((c for c in df.columns if 'lat' in c.lower() and '1' in c.lower()), None)
+    lon_col1 = next((c for c in df.columns if 'lng' in c.lower() or ('lon' in c.lower() and '1' in c.lower())), None)
+    lat_col2 = next((c for c in df.columns if 'lat' in c.lower() and '2' in c.lower()), None)
+    lon_col2 = next((c for c in df.columns if 'lng' in c.lower() or ('lon' in c.lower() and '2' in c.lower())), None)
+
+    if not lat_col1:
+        lat_col1 = next((c for c in df.columns if 'lat' in c.lower() or 'vĩ độ' in c.lower()), None)
+        lon_col1 = next((c for c in df.columns if 'lng' in c.lower() or 'lon' in c.lower() or 'kinh độ' in c.lower()), None)
+
+    if 'Tên đoạn cáp' in df.columns:
+        df['POP'] = df['Tên đoạn cáp'].apply(lambda x: str(x).split('.')[0] if '.' in str(x) else str(x))
+        pop_list = sorted(df['POP'].unique())
         
-    return path
+        # Multiselect Lọc POP + Nút Reset Bộ Lọc
+        selected_pops = st.sidebar.multiselect(
+            "LỌC DỮ LIỆU POP", 
+            options=pop_list, 
+            default=st.session_state.selected_pops,
+            key="pop_multiselect"
+        )
+        
+        col_r1, col_r2 = st.sidebar.columns([1, 1])
+        with col_r1:
+            if st.button("🔄 Reset bộ lọc", use_container_width=True):
+                st.session_state.selected_pops = []
+                st.session_state.break_result = None
+                st.session_state.break_gps = None
+                st.rerun()
 
-# 5. Khởi tạo Session State
-if 'user_lat' not in st.session_state:
-    st.session_state['user_lat'] = None
-if 'user_lon' not in st.session_state:
-    st.session_state['user_lon'] = None
-if 'is_routed' not in st.session_state:
-    st.session_state['is_routed'] = False
-
-# Nhận tọa độ GPS nhanh từ URL Parameters
-query_params = st.query_params
-if "lat" in query_params and "lon" in query_params:
-    try:
-        st.session_state['user_lat'] = float(query_params["lat"])
-        st.session_state['user_lon'] = float(query_params["lon"])
-    except:
-        pass
-
-# 6. Thanh Menu Sidebar Bên Trái
-with st.sidebar:
-    st.markdown("<h3 style='color: #27ae60; font-size: 18px; margin-bottom: 2px;'>⚡ TQG - Tuyến đường</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='color: #2ab7ca; font-size: 11px; margin-bottom: 15px;'>Make by BangNC13</p>", unsafe_allow_html=True)
-    
-    # Nút bấm lấy GPS Siêu Tốc bằng HTML5 Native Geolocation
-    st.components.v1.html("""
-        <button id="gps_btn" style="
-            width: 100%;
-            background-color: #ff4d4f;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            padding: 10px;
-            font-weight: bold;
-            font-size: 14px;
-            cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-        ">📍 Tôi đang đứng</button>
-
-        <script>
-            document.getElementById('gps_btn').onclick = function() {
-                var btn = this;
-                btn.innerHTML = "⚡ Đang bắt tín hiệu GPS...";
-                btn.style.backgroundColor = "#e63946";
-                
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(function(position) {
-                        const lat = position.coords.latitude;
-                        const lon = position.coords.longitude;
-                        const url = new URL(window.parent.location.href);
-                        url.searchParams.set('lat', lat);
-                        url.searchParams.set('lon', lon);
-                        window.parent.location.href = url.href;
-                    }, function(error) {
-                        alert("Lỗi: Hãy bật Vị Trí (GPS) trên thiết bị và cấp quyền cho trình duyệt!");
-                        btn.innerHTML = "📍 Tôi đang đứng";
-                        btn.style.backgroundColor = "#ff4d4f";
-                    }, {
-                        enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 0
-                    });
-                } else {
-                    alert("Trình duyệt thiết bị không hỗ trợ Geolocation.");
-                }
-            };
-        </script>
-    """, height=50)
-
-    # Hiển thị thông báo trạng thái GPS thành công
-    if st.session_state['user_lat'] is not None:
-        st.success(f"🟢 GPS ONLINE: {st.session_state['user_lat']:.4f}, {st.session_state['user_lon']:.4f}")
-
-    st.markdown("<hr style='margin: 10px 0; border: none; border-top: 1px solid #dcdfe6;'>", unsafe_allow_html=True)
-
-    # Lọc danh sách POP
-    all_objects = df['Tên đối tượng'].tolist()
-    st.markdown("**LỌC DỮ LIỆU POP**")
-    selected_names = st.multiselect(
-        "Lọc dữ liệu POP",
-        options=all_objects,
-        default=all_objects[:5] if len(all_objects) >= 5 else all_objects,
-        label_visibility="collapsed"
-    )
-
-    # Đổi style nút "Bấm" duy trì màu xanh dương khi lộ trình được tạo
-    if st.session_state['is_routed']:
-        st.markdown("""
-            <style>
-                div.stButton > button[kind="primary"] {
-                    background-color: #007bff !important;
-                    color: white !important;
-                    box-shadow: 0 0 10px rgba(0,123,255,0.5);
-                }
-            </style>
-        """, unsafe_allow_html=True)
-    
-    btn_type = "primary" if st.session_state['is_routed'] else "secondary"
-    if st.button("Bấm", type=btn_type):
-        if st.session_state['user_lat'] is None:
-            st.error("Chưa có GPS! Nhấn '📍 Tôi đang đứng' trước.")
+        if selected_pops:
+            pop_df = df[df['POP'].isin(selected_pops)].copy()
         else:
-            st.session_state['is_routed'] = True
+            pop_df = df.copy()
+    else:
+        pop_df = df.copy()
+
+    G = nx.Graph()
+    node_coords = {}
+
+    for _, row in pop_df.iterrows():
+        k1 = str(row.get('Điểm KN1', '')).strip()
+        k2 = str(row.get('Điểm KN2', '')).strip()
+        cable = str(row.get('Tên đoạn cáp', f"{k1}-{k2}")).strip()
+        
+        len_val = row.get('Chiều dài thực (m)')
+        length = float(len_val) if pd.notnull(len_val) else 0.0
+        
+        try:
+            if lat_col1 and lon_col1 and pd.notnull(row[lat_col1]) and pd.notnull(row[lon_col1]):
+                node_coords[k1] = (float(row[lat_col1]), float(row[lon_col1]))
+            if lat_col2 and lon_col2 and pd.notnull(row[lat_col2]) and pd.notnull(row[lon_col2]):
+                node_coords[k2] = (float(row[lat_col2]), float(row[lon_col2]))
+        except Exception:
+            pass
+
+        if k1 and k2:
+            G.add_edge(k1, k2, cable=cable, length=length)
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📍 THÔNG TIN ĐO (OTDR)")
+    
+    all_nodes = sorted(list(G.nodes()))
+    if all_nodes:
+        start_node = st.sidebar.selectbox("Điểm đo (Đang đứng)", all_nodes, key="start_node")
+        neighbors = list(G.neighbors(start_node)) if start_node in G else []
+        direction_node = st.sidebar.selectbox("Hướng đo (Xuôi ngọn / Về ODF)", neighbors, key="direction_node")
+        measured_len = st.sidebar.number_input("Chiều dài đo được (Mét)", min_value=0.0, value=170.0, step=10.0, key="measured_len")
+
+        col_btn1, col_btn2 = st.sidebar.columns(2)
+        with col_btn1:
+            btn_calc = st.button("🎯 Xác định", type="primary", use_container_width=True)
+        with col_btn2:
+            btn_reset = st.button("❌ Xóa kết quả", use_container_width=True)
+
+        if btn_reset:
+            st.session_state.break_result = None
+            st.session_state.break_gps = None
             st.rerun()
 
-# 7. Khởi tạo Bản đồ & Nhúng Badge ONLINE lên Map
-selected_df = df[df['Tên đối tượng'].isin(selected_names)].reset_index(drop=True)
+        if btn_calc and start_node and direction_node:
+            current = start_node
+            nxt = direction_node
+            accumulated = 0.0
+            visited = {current}
 
-if st.session_state['user_lat'] is not None:
-    my_loc_row = pd.DataFrame([{
-        'Tên đối tượng': '📍 Vị trí hiện tại của tôi',
-        'Latitude': st.session_state['user_lat'],
-        'Longitude': st.session_state['user_lon']
-    }])
-    full_df = pd.concat([my_loc_row, selected_df], ignore_index=True)
-else:
-    full_df = selected_df.copy()
+            b_res = None
+            b_gps = None
 
-center_lat = full_df['Latitude'].iloc[0] if len(full_df) > 0 else 21.823
-center_lon = full_df['Longitude'].iloc[0] if len(full_df) > 0 else 105.216
+            while True:
+                edge_data = G[current][nxt]
+                seg_len = edge_data['length']
+                cable_id = edge_data['cable']
+                visited.add(nxt)
 
-m = folium.Map(
-    location=[center_lat, center_lon], 
-    zoom_start=14,
-    zoom_control=False,
-    tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
-    attr="Google Maps Standard"
-)
+                if accumulated + seg_len >= measured_len:
+                    d1 = measured_len - accumulated
+                    d2 = seg_len - d1
+                    b_res = {
+                        "cable": cable_id,
+                        "from": current,
+                        "to": nxt,
+                        "d1": d1,
+                        "d2": d2,
+                        "seg_len": seg_len,
+                        "total": measured_len
+                    }
 
-# Đưa nút Zoom xuống góc dưới bên phải
-m.get_root().html.add_child(folium.Element('<script>L.control.zoom({ position: "bottomright" }).addTo(map);</script>'))
+                    if current in node_coords and nxt in node_coords and seg_len > 0:
+                        lat1, lon1 = node_coords[current]
+                        lat2, lon2 = node_coords[nxt]
+                        ratio = d1 / seg_len
+                        break_lat = lat1 + (lat2 - lat1) * ratio
+                        break_lon = lon1 + (lon2 - lon1) * ratio
+                        b_gps = (break_lat, break_lon)
+                    break
+                else:
+                    accumulated += seg_len
+                    next_nodes = [n for n in G.neighbors(nxt) if n not in visited]
+                    if not next_nodes:
+                        break
+                    current = nxt
+                    nxt = next_nodes[0]
 
-# Hiển thị nút "ONLINE / ĐÃ ĐỊNH VỊ" góc trên bên phải Bản đồ
-gps_status_color = "#27ae60" if st.session_state['user_lat'] is not None else "#7f8c8d"
-gps_status_text = "🟢 GPS ONLINE" if st.session_state['user_lat'] is not None else "⚪ GPS OFFLINE"
+            st.session_state.break_result = b_res
+            st.session_state.break_gps = b_gps
+            st.rerun()
 
-online_badge_html = f'''
-    <div style="
-        position: fixed;
-        top: 15px;
-        right: 15px;
-        z-index: 9999;
-        background-color: {gps_status_color};
-        color: white;
-        padding: 6px 12px;
-        border-radius: 20px;
-        font-family: sans-serif;
-        font-size: 12px;
-        font-weight: bold;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    ">
-        {gps_status_text}
-    </div>
-'''
-m.get_root().html.add_child(folium.Element(online_badge_html))
+    if st.session_state.break_result:
+        res = st.session_state.break_result
+        st.sidebar.error("🚨 VỊ TRÍ ĐỨT CÁP DỰ KIẾN")
+        st.sidebar.markdown(f"**Đoạn cáp:** `{res['cable']}`")
+        st.sidebar.info(
+            f"🔹 **Từ {res['from']}:** `{res['d1']:.1f} m`\n\n"
+            f"🔸 **Từ {res['to']}:** `{res['d2']:.1f} m`"
+        )
+        if st.session_state.break_gps:
+            gps = st.session_state.break_gps
+            gmap_url = f"https://www.google.com/maps?q={gps[0]},{gps[1]}"
+            st.sidebar.link_button("📍 Mở trên Google Maps", gmap_url, type="primary", use_container_width=True)
 
-# 8. Vẽ đường đi hoặc vẽ Marker các điểm
-if st.session_state['is_routed'] and st.session_state['user_lat'] is not None and len(full_df) > 1:
-    path_indices = solve_tsp_from_start(full_df)
-    ordered_df = full_df.iloc[path_indices].reset_index(drop=True)
+    # 2. Dữ liệu Bản đồ
+    map_center = [21.0285, 105.8542]
+    zoom_lvl = 12
 
-    raw_coords = ordered_df[['Latitude', 'Longitude']].values.tolist()
-    osrm_route = get_osrm_route(raw_coords)
+    if st.session_state.break_gps:
+        map_center = list(st.session_state.break_gps)
+        zoom_lvl = 18
+    elif len(node_coords) > 0:
+        first_coord = list(node_coords.values())[0]
+        map_center = [first_coord[0], first_coord[1]]
+        zoom_lvl = 15
 
-    # Đường Polyline màu xanh dương
-    folium.PolyLine(
-        osrm_route, 
-        color="#007bff", 
-        weight=6, 
-        opacity=0.85
-    ).add_to(m)
+    polylines = []
+    markers = []
+    break_marker = None
 
-    for idx, row in ordered_df.iterrows():
-        seq_num = idx + 1
-        is_my_loc = (row['Tên đối tượng'] == '📍 Vị trí hiện tại của tôi')
-        bg_color = "#e74c3c" if is_my_loc else "#007bff"
-        
-        marker_html = f'''
-            <div style="font-family:sans-serif; font-size:10pt; color:white; background-color:{bg_color}; 
-                        border:2px solid white; border-radius:50%; width:28px; height:28px; 
-                        text-align:center; line-height:24px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.3);">
-                {seq_num if not is_my_loc else "🛵"}
+    if st.session_state.break_result:
+        u = st.session_state.break_result['from']
+        v = st.session_state.break_result['to']
+
+        if u in node_coords and v in node_coords:
+            polylines.append({
+                "coords": [node_coords[u], node_coords[v]],
+                "color": "#FF2A6D",
+                "weight": 6,
+                "opacity": 0.9,
+                "tooltip": f"Sự cố đoạn: {st.session_state.break_result['cable']}"
+            })
+
+            for node in [u, v]:
+                markers.append({
+                    "coords": node_coords[node],
+                    "popup": f"<b>Điểm Kết Nối:</b> {node}",
+                    "tooltip": f"Điểm KN: {node}",
+                    "color": "#05D5E7",
+                    "radius": 7
+                })
+
+        if st.session_state.break_gps:
+            res = st.session_state.break_result
+            gps = st.session_state.break_gps
+            gmap_url = f"https://www.google.com/maps?q={gps[0]},{gps[1]}"
+            
+            popup_html = f"""
+            <div style="font-family: sans-serif; min-width: 180px; color: #1E293B;">
+                <b style="color: #E11D48; font-size: 13px;">🚨 VỊ TRÍ ĐỨT CÁP: {res['cable']}</b><br/>
+                <div style="margin: 6px 0; font-size: 12px; line-height: 1.4;">
+                    • Cách <b>{res['from']}</b>: {res['d1']:.1f}m<br/>
+                    • Cách <b>{res['to']}</b>: {res['d2']:.1f}m
+                </div>
+                <a href="{gmap_url}" target="_blank" style="
+                    display: inline-block; width: 100%; text-align: center;
+                    background-color: #10B981; color: white; padding: 6px 0;
+                    margin-top: 4px; border-radius: 4px; text-decoration: none;
+                    font-weight: bold; font-size: 11px;
+                ">📍 Mở trên Google Maps</a>
             </div>
-        '''
-        folium.Marker(
-            location=[row['Latitude'], row['Longitude']],
-            tooltip=f"{seq_num}. {row['Tên đối tượng']}",
-            icon=folium.DivIcon(html=marker_html)
-        ).add_to(m)
+            """
+            
+            break_marker = {
+                "coords": list(st.session_state.break_gps),
+                "popup": popup_html,
+                "tooltip": "🚨 Vị trí đứt cáp"
+            }
+
+    else:
+        for u, v, data in G.edges(data=True):
+            if u in node_coords and v in node_coords:
+                polylines.append({
+                    "coords": [node_coords[u], node_coords[v]],
+                    "color": "#38BDF8",
+                    "weight": 3,
+                    "opacity": 0.7,
+                    "tooltip": f"Cáp: {data.get('cable', '')}"
+                })
+
+        for node_id, coord in node_coords.items():
+            markers.append({
+                "coords": coord,
+                "popup": f"<b>Điểm KN:</b> {node_id}",
+                "tooltip": str(node_id),
+                "color": "#818CF8",
+                "radius": 4
+            })
+
+    # 3. Leaflet HTML - Tinh chỉnh Dark Mode & Bắt GPS Siêu Nhanh
+    leaflet_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+            html, body {{
+                width: 100%; height: 100vh; margin: 0; padding: 0;
+                overflow: hidden; background-color: #0E1117;
+            }}
+            #map {{
+                width: 100%; height: 100vh; background: #0E1117;
+            }}
+            
+            /* Dark Theme cho Map Controls */
+            .leaflet-control-layers, .leaflet-bar {{
+                background-color: #1E293B !important;
+                border: 1px solid #334155 !important;
+                color: #F8FAFC !important;
+            }}
+            .leaflet-control-layers-toggle {{
+                filter: invert(1);
+            }}
+            .leaflet-control-zoom-in, .leaflet-control-zoom-out {{
+                color: #F8FAFC !important;
+                background-color: #1E293B !important;
+            }}
+
+            /* Hiệu ứng chớp nháy điểm đứt cáp */
+            .custom-break-icon {{
+                background-color: #FF2A6D;
+                border: 2px solid #FFFFFF;
+                border-radius: 50%;
+                width: 24px !important;
+                height: 24px !important;
+                margin-left: -12px !important;
+                margin-top: -12px !important;
+                box-shadow: 0 0 15px rgba(255, 42, 109, 1);
+                animation: pulse 1.2s infinite;
+            }}
+            @keyframes pulse {{
+                0% {{ transform: scale(0.9); box-shadow: 0 0 0 0 rgba(255, 42, 109, 0.8); }}
+                70% {{ transform: scale(1.3); box-shadow: 0 0 0 15px rgba(255, 42, 109, 0); }}
+                100% {{ transform: scale(0.9); box-shadow: 0 0 0 0 rgba(255, 42, 109, 0); }}
+            }}
+
+            /* Vị trí GPS Người dùng */
+            .user-location-marker {{
+                background-color: #3B82F6;
+                border: 3px solid #FFFFFF;
+                border-radius: 50%;
+                width: 18px !important;
+                height: 18px !important;
+                margin-left: -9px !important;
+                margin-top: -9px !important;
+                box-shadow: 0 0 10px rgba(59, 130, 246, 0.9);
+            }}
+
+            .leaflet-control-locate {{
+                background-color: #1E293B;
+                border: 1px solid #334155;
+                border-radius: 4px;
+                width: 34px; height: 34px;
+                line-height: 32px; text-align: center;
+                cursor: pointer; font-size: 18px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div id="map"></div>
+        <script>
+            document.addEventListener("DOMContentLoaded", function() {{
+                // Lớp Nền Dark Theme CartoDB
+                var darkCarto = L.tileLayer('https://{{s}}.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
+                    maxZoom: 20, attribution: 'CartoDB Dark'
+                }});
+
+                // Lớp Nền Google Đường Phố & Vệ Tinh
+                var googleStreets = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}', {{
+                    maxZoom: 20, attribution: 'Google Maps'
+                }});
+                var googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s,h&x={{x}}&y={{y}}&z={{z}}', {{
+                    maxZoom: 20, attribution: 'Google Satellite'
+                }});
+
+                var map = L.map('map', {{
+                    zoomControl: true,
+                    attributionControl: false,
+                    layers: [darkCarto]
+                }}).setView({json.dumps(map_center)}, {zoom_lvl});
+
+                var baseMaps = {{
+                    "🌙 Dark Mode": darkCarto,
+                    "🗺️ Google Đường phố": googleStreets,
+                    "🛰️ Google Vệ tinh": googleSat
+                }};
+                L.control.layers(baseMaps, null, {{ position: 'topright' }}).addTo(map);
+
+                // Vẽ Tuyến Cáp
+                var polylinesData = {json.dumps(polylines)};
+                polylinesData.forEach(function(item) {{
+                    var line = L.polyline(item.coords, {{
+                        color: item.color, weight: item.weight, opacity: item.opacity
+                    }}).addTo(map);
+                    if (item.tooltip) line.bindTooltip(item.tooltip);
+                }});
+
+                // Vẽ Điểm Kết Nối (Nodes)
+                var markersData = {json.dumps(markers)};
+                markersData.forEach(function(item) {{
+                    var circle = L.circleMarker(item.coords, {{
+                        radius: item.radius, color: item.color, fillColor: '#0F172A', fillOpacity: 0.9, weight: 2
+                    }}).addTo(map);
+                    if (item.popup) circle.bindPopup(item.popup);
+                    if (item.tooltip) circle.bindTooltip(item.tooltip);
+                }});
+
+                // Vẽ Điểm Đứt Cáp
+                var breakMarkerData = {json.dumps(break_marker)};
+                if (breakMarkerData) {{
+                    var breakIcon = L.divIcon({{ className: 'custom-break-icon' }});
+                    var bMarker = L.marker(breakMarkerData.coords, {{ icon: breakIcon }}).addTo(map);
+                    if (breakMarkerData.popup) bMarker.bindPopup(breakMarkerData.popup).openPopup();
+                    if (breakMarkerData.tooltip) bMarker.bindTooltip(breakMarkerData.tooltip);
+                }}
+
+                // -------------------------------------------------------------
+                // ĐỊNH VỊ GPS SIÊU NHANH BẰNG BROWSER GEOLOCATION API DIRECT
+                // -------------------------------------------------------------
+                var userMarker = null;
+                var accuracyCircle = null;
+
+                function updateLocation(pos) {{
+                    var lat = pos.coords.latitude;
+                    var lng = pos.coords.longitude;
+                    var latlng = [lat, lng];
+                    var radius = pos.coords.accuracy / 2;
+
+                    if (userMarker) {{
+                        userMarker.setLatLng(latlng);
+                        accuracyCircle.setLatLng(latlng).setRadius(radius);
+                    }} else {{
+                        var userIcon = L.divIcon({{ className: 'user-location-marker' }});
+                        userMarker = L.marker(latlng, {{ icon: userIcon }}).addTo(map)
+                            .bindPopup("<b>Vị trí hiện tại của bạn</b>");
+                        accuracyCircle = L.circle(latlng, radius, {{
+                            color: '#3B82F6', fillColor: '#3B82F6', fillOpacity: 0.15, weight: 1
+                        }}).addTo(map);
+                    }}
+                }}
+
+                function handleGPSError(err) {{
+                    console.warn("GPS Warning/Error: " + err.message);
+                }}
+
+                // Kích hoạt định vị siêu tốc với cấu hình độ chính xác cao và không dùng cache
+                if ("geolocation" in navigator) {{
+                    navigator.geolocation.watchPosition(updateLocation, handleGPSError, {{
+                        enableHighAccuracy: true,
+                        maximumAge: 0,
+                        timeout: 5000
+                    }});
+                }}
+
+                // Nút Bấm Định Vị Nhanh
+                var locateControl = L.Control.extend({{
+                    options: {{ position: 'topleft' }},
+                    onAdd: function (map) {{
+                        var container = L.DomUtil.create('div', 'leaflet-control-locate');
+                        container.innerHTML = '🎯';
+                        container.title = "Định vị vị trí của tôi";
+                        container.onclick = function() {{
+                            if ("geolocation" in navigator) {{
+                                navigator.geolocation.getCurrentPosition(function(pos) {{
+                                    var latlng = [pos.coords.latitude, pos.coords.longitude];
+                                    map.flyTo(latlng, 18);
+                                    updateLocation(pos);
+                                }}, handleGPSError, {{ enableHighAccuracy: true, timeout: 3000 }});
+                            }
+                        }};
+                        return container;
+                    }}
+                }});
+                map.addControl(new locateControl());
+
+                setTimeout(function() {{ map.invalidateSize(); }}, 200);
+            }});
+        </script>
+    </body>
+    </html>
+    """
+
+    components.html(leaflet_html, height=1000, scrolling=False)
 
 else:
-    for idx, row in full_df.iterrows():
-        is_my_loc = (row['Tên đối tượng'] == '📍 Vị trí hiện tại của tôi')
-        bg_color = "#e74c3c" if is_my_loc else "#27ae60"
-        icon_str = "🛵" if is_my_loc else "📍"
-        
-        marker_html = f'''
-            <div style="font-family:sans-serif; font-size:10pt; color:white; background-color:{bg_color}; 
-                        border:2px solid white; border-radius:50%; width:28px; height:28px; 
-                        text-align:center; line-height:24px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.3);">
-                {icon_str}
-            </div>
-        '''
-        folium.Marker(
-            location=[row['Latitude'], row['Longitude']],
-            tooltip=row['Tên đối tượng'],
-            icon=folium.DivIcon(html=marker_html)
-        ).add_to(m)
-
-st_folium(m, width="100%", height=850, returned_objects=[])
+    st.error("❌ Không tìm thấy file Excel trên Server. Vui lòng kiểm tra lại file data trong thư mục.")
