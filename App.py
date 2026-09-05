@@ -88,7 +88,6 @@ st.markdown("""
 
 # 3. Hàm phụ trợ
 def haversine(lat1, lon1, lat2, lon2):
-    """Tính khoảng cách mét giữa 2 điểm GPS"""
     r = 6371000
     phi1, phi2 = radians(lat1), radians(lat2)
     dphi = radians(lat2 - lat1)
@@ -194,13 +193,11 @@ with st.sidebar:
     
     st.markdown("<div class='hud-label'>📡 Trạng thái định vị GPS:</div>", unsafe_allow_html=True)
     
-    # Lấy tọa độ khởi tạo bằng get_geolocation
     loc_data = get_geolocation()
     if loc_data and 'coords' in loc_data:
         new_lat = loc_data['coords']['latitude']
         new_lon = loc_data['coords']['longitude']
         
-        # Nếu di chuyển quá 20 mét, tự cập nhật vị trí & lộ trình
         if st.session_state.current_loc is None or haversine(st.session_state.current_loc[0], st.session_state.current_loc[1], new_lat, new_lon) > 20:
             st.session_state.current_loc = (new_lat, new_lon)
             if st.session_state.selected_targets and st.session_state.route_coords:
@@ -318,7 +315,7 @@ if st.session_state.route_coords:
 
 folium.LayerControl().add_to(m)
 
-# Inject JS Realtime Geolocation Tracker vào bản đồ
+# INJECT JAVASCRIPT & CSS DẠNG GOOGLE MAPS BLUE DOT WITH PULSE
 js_realtime_tracker = """
 <script>
     setTimeout(function() {
@@ -326,11 +323,12 @@ js_realtime_tracker = """
         if (!map_element) return;
         var map = map_element._leaflet_map;
         
-        var userIcon = L.divIcon({
-            className: 'custom-user-icon',
-            html: '<div style="background:#ff0033; width:18px; height:18px; border-radius:50%; border:3px solid #ffffff; box-shadow: 0 0 15px #ff0033; animation: pulse 1.5s infinite;"></div>',
-            iconSize: [18, 18],
-            iconAnchor: [9, 9]
+        // Tạo Icon chuẩn Google Maps với CSS Ripple Pulsing
+        var googleDotIcon = L.divIcon({
+            className: 'gmaps-marker',
+            html: '<div class="gmaps-pulse"></div><div class="gmaps-dot"></div>',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
         });
 
         var userMarker = null;
@@ -342,8 +340,8 @@ js_realtime_tracker = """
                 var newLatLng = new L.LatLng(lat, lng);
 
                 if (!userMarker) {
-                    userMarker = L.marker(newLatLng, {icon: userIcon}).addTo(map);
-                    userMarker.bindTooltip("Vị trí Realtime", {permanent: false});
+                    userMarker = L.marker(newLatLng, {icon: googleDotIcon, zIndexOffset: 1000}).addTo(map);
+                    userMarker.bindTooltip("Vị trí của bạn (Realtime)", {permanent: false, direction: 'top'});
                 } else {
                     userMarker.setLatLng(newLatLng);
                 }
@@ -357,11 +355,52 @@ js_realtime_tracker = """
         }
     }, 1000);
 </script>
+
 <style>
-@keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(255, 0, 51, 0.7); }
-    70% { box-shadow: 0 0 0 15px rgba(255, 0, 51, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(255, 0, 51, 0); }
+.gmaps-marker {
+    position: relative;
+    width: 24px;
+    height: 24px;
+}
+
+.gmaps-dot {
+    width: 16px;
+    height: 16px;
+    background-color: #4285F4;
+    border: 3px solid #FFFFFF;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    z-index: 2;
+}
+
+.gmaps-pulse {
+    width: 40px;
+    height: 40px;
+    background-color: rgba(66, 133, 244, 0.35);
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation: gmaps-ripple 2s infinite ease-out;
+    z-index: 1;
+}
+
+@keyframes gmaps-ripple {
+    0% {
+        width: 16px;
+        height: 16px;
+        opacity: 0.8;
+    }
+    100% {
+        width: 50px;
+        height: 50px;
+        opacity: 0;
+    }
 }
 </style>
 """
@@ -369,5 +408,5 @@ js_realtime_tracker = """
 # Render Map
 map_data = st_folium(m, width="100%", height=850)
 
-# Inject đoạn mã Javascript Realtime
+# Inject đoạn mã HTML/JS
 st.components.v1.html(js_realtime_tracker, height=0)
