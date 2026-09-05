@@ -13,44 +13,59 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Inject CSS Custom: Theme Cam Robotic & Bản đồ tràn full 100% màn hình
+# 2. Inject CSS Custom: Fix triệt để tràn viền 100% màn hình & vỡ layout Sidebar
 st.markdown("""
 <style>
     /* Nhập font Cyberpunk / Sci-Fi */
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
 
-    /* Ẩn Header, Footer và Toolbar mặc định của Streamlit */
-    header, footer, [data-testid="stHeader"] {
+    /* Ẩn Header, Footer & Manage App Button của Streamlit */
+    header, footer, [data-testid="stHeader"], [data-testid="stStatusWidget"], .stAppViewerToolbar {
         display: none !important;
     }
 
-    /* Bỏ hoàn toàn Padding khu vực Main Content để Map sát cạnh tuyệt đối */
-    .block-container {
-        padding: 0rem !important;
-        margin: 0rem !important;
-        max-width: 100% !important;
-    }
-
-    /* Xóa khoảng trống thừa trong container chứa bản đồ */
-    [data-testid="stVerticalBlock"] {
-        gap: 0rem !important;
-    }
-
-    /* Đổi nền chính toàn ứng dụng sang màu Cam Tối */
-    .stApp {
+    /* Đưa chiều cao ứng dụng về 100vh chuẩn */
+    html, body, .stApp {
+        height: 100vh !important;
+        overflow: hidden !important;
         background-color: #1a0a00 !important;
     }
 
-    /* Ép tất cả văn bản thường thành màu TRẮNG */
-    html, body, [class*="css"], .stMarkdown, p, span, label, div {
+    /* Bỏ hoàn toàn Padding khu vực Main Content */
+    .main .block-container {
+        padding: 0rem !important;
+        margin: 0rem !important;
+        max-width: 100% !important;
+        height: 100vh !important;
+    }
+
+    /* Ép iframe bản đồ và container chứa bản đồ chiếm chính xác 100% chiều cao màn hình */
+    iframe, .element-container, div[data-testid="stCustomComponentV1"] {
+        height: 100vh !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Ép văn bản thường thành màu TRẮNG */
+    p, span, label, div {
         color: #ffffff !important;
     }
 
-    /* Tối ưu nền Sidebar dạng Dark Orange Robotic Gradient */
+    /* Tối ưu nền Sidebar */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #331400 0%, #1f0c00 100%) !important;
         border-right: 2px solid #ff6600 !important;
         box-shadow: 5px 0px 15px rgba(255, 102, 0, 0.4) !important;
+        height: 100vh !important;
+    }
+
+    /* Fix lỗi đường kẻ ngang: Chỉ áp dụng màu cho hr chuẩn, tránh vỡ layout Sidebar */
+    hr {
+        border: none !important;
+        border-top: 1px solid #ff6600 !important;
+        opacity: 0.5 !important;
+        margin: 15px 0 !important;
     }
 
     /* Style Tiêu đề Sidebar */
@@ -87,7 +102,7 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    /* Container hiển thị thông số dạng HUD display */
+    /* Thẻ HUD */
     .hud-card {
         background: rgba(51, 20, 0, 0.85) !important;
         border: 1px solid #ff6600 !important;
@@ -110,18 +125,6 @@ st.markdown("""
         font-size: 1.3rem;
         font-weight: bold;
         font-family: 'Orbitron', sans-serif;
-    }
-
-    /* Divider */
-    hr {
-        border-color: #ff6600 !important;
-        opacity: 0.5;
-    }
-
-    /* Ép khung iframe của Folium tràn 100% chiều cao màn hình */
-    iframe {
-        height: 100vh !important;
-        width: 100% !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -336,5 +339,5 @@ if st.session_state.route_coords:
 
 folium.LayerControl().add_to(m)
 
-# Render Map 100% VH tràn full viền
-st_folium(m, width="100%", height=1000)
+# Ép truyền kích thước rộng/cao tràn tuyệt đối
+st_folium(m, use_container_width=True, height=1000)
