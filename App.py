@@ -135,7 +135,7 @@ st.markdown("""
         background-color: rgba(0, 240, 255, 0.2) !important;
     }
 
-    /* ================= BO TRÒN VÀ TẠO HIỆU ỨNG NEON XANH CHO NÚT COLLAPSE/EXPAND SIDEBAR ================= */
+    /* NÚT COLLAPSE/EXPAND SIDEBAR NEON XANH */
     [data-testid="stSidebarCollapseButton"] button,
     [data-testid="stSidebarExpandButton"] button {
         background-color: #1f0c00 !important;
@@ -152,14 +152,12 @@ st.markdown("""
         justify-content: center !important;
     }
 
-    /* Đổi màu icon svg bên trong nút */
     [data-testid="stSidebarCollapseButton"] button svg,
     [data-testid="stSidebarExpandButton"] button svg {
         fill: #00f0ff !important;
         color: #00f0ff !important;
     }
 
-    /* Hiệu ứng Hover Rực Sáng Neon */
     [data-testid="stSidebarCollapseButton"] button:hover,
     [data-testid="stSidebarExpandButton"] button:hover {
         background-color: #00f0ff !important;
@@ -171,6 +169,37 @@ st.markdown("""
     [data-testid="stSidebarExpandButton"] button:hover svg {
         fill: #000000 !important;
         color: #000000 !important;
+    }
+
+    /* ================= TRONG SUỐT MENU TRÊN BẢN ĐỒ (FOLIUM LAYER CONTROL) ================= */
+    .leaflet-control-layers {
+        background: rgba(31, 12, 0, 0.4) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        border: 1px solid rgba(0, 240, 255, 0.6) !important;
+        border-radius: 8px !important;
+        box-shadow: 0 0 15px rgba(0, 240, 255, 0.3) !important;
+        color: #00f0ff !important;
+        font-family: 'Rajdhani', sans-serif !important;
+    }
+
+    .leaflet-control-layers-toggle {
+        background-color: rgba(31, 12, 0, 0.6) !important;
+        border-radius: 50% !important;
+        border: 1px solid #00f0ff !important;
+        box-shadow: 0 0 8px rgba(0, 240, 255, 0.5) !important;
+    }
+
+    .leaflet-control-layers-expanded {
+        padding: 10px 14px !important;
+        color: #ffffff !important;
+    }
+
+    .leaflet-control-layers-overlays label, 
+    .leaflet-control-layers-base label {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        text-shadow: 0 0 4px rgba(0, 0, 0, 0.8) !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -213,7 +242,7 @@ def get_optimized_route_roundtrip(origin, points_list):
 
         # Tạo danh sách các điểm ghé thăm
         ordered_points = []
-        route_coords_str = f"{origin[1]},{origin[0]}" # Xuất phát từ Điểm Bắt Đầu
+        route_coords_str = f"{origin[1]},{origin[0]}"
         
         for order, idx in enumerate(ordered_indices, 1):
             pt = all_points[idx]
@@ -225,7 +254,7 @@ def get_optimized_route_roundtrip(origin, points_list):
             })
             route_coords_str += f";{pt['Longitude']},{pt['Latitude']}"
 
-        # NỐI LẠI ĐIỂM XUẤT PHÁT VÀO CUỐI LỘ TRÌNH (BẮT ĐẦU = KẾT THÚC)
+        # NỐI LẠI ĐIỂM XUẤT PHÁT VÀO CUỐI LỘ TRÌNH
         route_coords_str += f";{origin[1]},{origin[0]}"
 
         # Lấy tuyến đường khép kín từ OSRM Route API
