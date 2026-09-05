@@ -3,78 +3,58 @@ import pandas as pd
 import numpy as np
 import folium
 from streamlit_folium import st_folium
-import urllib.parse
 
-# 1. Cấu hình trang & CSS Giao diện Clean Light
+# 1. Cấu hình trang & Ép Sidebar luôn mở ở trạng thái ban đầu
 st.set_page_config(layout="wide", page_title="TQG - XÁC ĐỊNH VỊ TRÍ DỨT CÁP", initial_sidebar_state="expanded")
 
+# 2. CSS Sửa lỗi hiển thị & Khôi phục Menu bên trái
 st.markdown("""
     <style>
-        /* Base App Styling */
+        /* Sửa lề ứng dụng */
         .stApp {
             background-color: #f8f9fa;
-            color: #212529;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
         .block-container {
-            padding: 0.5rem 0.5rem 0rem 0.5rem !important;
+            padding: 0rem !important;
         }
-        header {visibility: hidden;}
-
-        /* Nút toggle Sidebar mặc định của Streamlit */
-        button[data-testid="baseButton-header"] {
+        
+        /* Hiển thị rõ nét nút đóng/mở Sidebar ở góc trên trái */
+        [data-testid="stSidebarCollapseButton"] {
             background-color: #ffffff !important;
             border: 1px solid #dcdfe6 !important;
-            border-radius: 6px !important;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1) !important;
-            position: fixed !important;
-            top: 10px !important;
-            left: 10px !important;
+            border-radius: 4px !important;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important;
+            color: #333333 !important;
             z-index: 999999 !important;
         }
 
-        /* Sidebar Styling */
+        /* Định dạng Menu Sidebar bên trái chuẩn sáng */
         section[data-testid="stSidebar"] {
-            background-color: #f4f6f8;
-            border-right: 1px solid #e1e4e8;
-            padding-top: 1rem;
+            background-color: #f0f2f5 !important;
+            border-right: 1px solid #dcdfe6 !important;
+            min-width: 320px !important;
+            max-width: 360px !important;
         }
-
-        .card-title {
-            font-size: 11px;
-            font-weight: 700;
-            color: #6c757d;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 6px;
+        
+        section[data-testid="stSidebar"] .stMarkdown h3 {
+            font-size: 16px !important;
+            font-weight: 700 !important;
+            color: #27ae60 !important;
+            margin-bottom: 2px !important;
         }
-
-        /* Nút bấm Custom */
-        .btn-danger {
+        
+        /* Chỉnh style cho các nút Xác định / Xóa */
+        div.stButton > button {
             width: 100%;
-            background-color: #ff4d4f;
-            color: white;
-            border: none;
-            padding: 8px;
             border-radius: 4px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .btn-secondary {
-            width: 100%;
-            background-color: #e0e0e0;
-            color: #333;
+            font-weight: bold;
             border: none;
-            padding: 8px;
-            border-radius: 4px;
-            font-weight: 600;
-            cursor: pointer;
+            padding: 8px 16px;
         }
     </style>
 """, unsafe_allow_html=True)
 
-# 2. Nạp dữ liệu Excel
+# 3. Nạp dữ liệu Excel
 @st.cache_data
 def load_data():
     df = pd.read_excel('QuanLyTĐ.xlsx', sheet_name='TĐ')
@@ -87,7 +67,7 @@ except Exception as e:
     st.error(f"[SYSTEM ERROR]: Không thể nạp dữ liệu. Chi tiết: {e}")
     st.stop()
 
-# 3. Thuật toán Haversine & TSP
+# 4. Thuật toán Haversine & TSP
 def haversine_matrix(coords):
     rads = np.radians(coords)
     lats, lons = rads[:, 0], rads[:, 1]
@@ -116,30 +96,26 @@ def solve_tsp(selected_df):
         
     return path, total_dist
 
-# 4. Thanh Menu bên cạnh (Sidebar) Ban đầu
+# 5. Khai báo Thanh Menu Sidebar Bên Trái
 with st.sidebar:
-    st.markdown("""
-        <div style="margin-bottom: 12px;">
-            <div style="color: #27ae60; font-size: 16px; font-weight: bold;">⚡ TQG-XÁC ĐỊNH VỊ TRÍ DỨT CÁP</div>
-            <div style="color: #2ab7ca; font-size: 11px; font-weight: 500;">Make by BangNC13</div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown("### ⚡ TQG-XÁC ĐỊNH VỊ TRÍ DỨT CÁP")
+    st.markdown("<p style='color: #2ab7ca; font-size: 11px; margin-bottom: 15px;'>Make by BangNC13</p>", unsafe_allow_html=True)
     
     all_objects = df['Tên đối tượng'].tolist()
     
-    # Lọc dữ liệu POP
-    st.markdown('<div class="card-title">LỌC DỮ LIỆU POP</div>', unsafe_allow_html=True)
+    # 5.1 Lọc dữ liệu POP
+    st.markdown("**LỌC DỮ LIỆU POP**")
     selected_names = st.multiselect(
-        "Chọn danh sách tập điểm:",
+        "Lọc dữ liệu POP",
         options=all_objects,
         default=all_objects[:10] if len(all_objects) >= 10 else all_objects[:2],
         label_visibility="collapsed"
     )
     
-    st.markdown("<hr style='margin: 12px 0; border: none; border-top: 1px solid #e1e4e8;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #dcdfe6;'>", unsafe_allow_html=True)
     
-    # Thông tin đo OTDR
-    st.markdown('<div class="card-title">📍 THÔNG TIN ĐO (OTDR)</div>', unsafe_allow_html=True)
+    # 5.2 Thông tin đo OTDR
+    st.markdown("**📍 THÔNG TIN ĐO (OTDR)**")
     
     st.caption("Điểm đo (Đang đứng)")
     start_node_name = st.selectbox("Start Node", options=selected_names if selected_names else all_objects, label_visibility="collapsed")
@@ -150,15 +126,16 @@ with st.sidebar:
     st.caption("Chiều dài đo được (Mét)")
     measure_dist = st.number_input("Dist", value=170.00, step=10.0, format="%.2f", label_visibility="collapsed")
     
+    st.markdown("<br>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown('<button class="btn-danger">📌 Xác định</button>', unsafe_allow_html=True)
+        st.button("📌 Xác định", type="primary")
     with col2:
-        st.markdown('<button class="btn-secondary">🗑️ Xóa</button>', unsafe_allow_html=True)
+        st.button("🗑️ Xóa")
 
-# 5. Hiển thị Bản đồ
+# 6. Hiển thị Bản đồ bên phải
 if len(selected_names) < 2:
-    st.warning("Vui lòng chọn ít nhất 2 điểm dừng trong Menu bên cạnh.")
+    st.info("Vui lòng chọn từ 2 điểm trở lên trong Menu bên trái để hiển thị bản đồ.")
 else:
     selected_df = df[df['Tên đối tượng'].isin(selected_names)].reset_index(drop=True)
     path_indices, total_km = solve_tsp(selected_df)
@@ -167,31 +144,32 @@ else:
     center_lat = ordered_df['Latitude'].mean()
     center_lon = ordered_df['Longitude'].mean()
 
+    # Khởi tạo bản đồ Google Maps Sáng
     m = folium.Map(
         location=[center_lat, center_lon], 
-        zoom_start=13,
+        zoom_start=12,
         zoom_control=False,
         tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
         attr="Google Maps Standard"
     )
 
-    # Đưa nút Zoom (+ -) xuống góc dưới bên phải
+    # Đưa nút Zoom (+ -) xuống góc dưới phải
     m.get_root().html.add_child(folium.Element('''
         <script>
             L.control.zoom({ position: 'bottomright' }).addTo(map);
         </script>
     '''))
 
-    # Nút bấm góc trên trái (GPS của tôi & Chỉ đường) - Thắt chặt lề trái 60px để không che nút Hamburger Menu
+    # Nút bấm nổi ở góc trên trái của Bản đồ (Cách lề 60px để không dính nút Menu)
     first_target_lat = ordered_df.iloc[0]['Latitude']
     first_target_lon = ordered_df.iloc[0]['Longitude']
     direct_gmaps_url = f"https://www.google.com/maps/dir/?api=1&destination={first_target_lat},{first_target_lon}"
 
-    top_buttons_html = f'''
+    map_overlay_buttons = f'''
     <div style="
         position: fixed; 
-        top: 12px; 
-        left: 60px; 
+        top: 15px; 
+        left: 65px; 
         z-index: 9999; 
         display: flex;
         flex-direction: column;
@@ -204,13 +182,13 @@ else:
             border: 1px solid #cccccc;
             padding: 6px 12px;
             border-radius: 4px;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
             cursor: pointer;
             box-shadow: 0 2px 5px rgba(0,0,0,0.15);
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
         ">
             <span style="color: #ff4d4f;">🎯</span> GPS của tôi
         </button>
@@ -219,15 +197,15 @@ else:
             background: #00b894;
             color: #ffffff;
             border: none;
-            padding: 7px 12px;
+            padding: 6px 12px;
             border-radius: 4px;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
             text-decoration: none;
             box-shadow: 0 2px 5px rgba(0,0,0,0.15);
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
         ">
             🛣️ Chỉ đường tới điểm sự cố
         </a>
@@ -248,15 +226,15 @@ else:
                         fillOpacity: 0.9
                     }}).addTo(map).bindPopup("📍 Vị trí hiện tại của bạn").openPopup();
                 }}, function() {{
-                    alert("Không thể truy cập GPS vị trí của bạn.");
+                    alert("Không thể lấy dữ liệu GPS.");
                 }});
             }}
         }}
     </script>
     '''
-    m.get_root().html.add_child(folium.Element(top_buttons_html))
+    m.get_root().html.add_child(folium.Element(map_overlay_buttons))
 
-    # Vẽ tuyến đường
+    # Vẽ đường tuyến nối các điểm
     route_coords = ordered_df[['Latitude', 'Longitude']].values.tolist()
     folium.PolyLine(
         route_coords, 
@@ -265,10 +243,9 @@ else:
         opacity=0.8
     ).add_to(m)
 
-    # Marker điểm dừng
+    # Đặt Marker các điểm mốc tròn màu xanh
     for idx, row in ordered_df.iterrows():
         seq_num = idx + 1
-        
         marker_icon_html = f'''
             <div style="
                 font-family: sans-serif;
@@ -286,12 +263,11 @@ else:
                 {seq_num}
             </div>
         '''
-        
         folium.Marker(
             location=[row['Latitude'], row['Longitude']],
             tooltip=f"{seq_num}. {row['Tên đối tượng']}",
             icon=folium.DivIcon(html=marker_icon_html)
         ).add_to(m)
 
-    # Hiển thị bản đồ tràn màn hình
+    # Hiển thị bản đồ
     st_folium(m, width="100%", height=850, returned_objects=[])
