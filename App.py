@@ -144,14 +144,14 @@ def load_data(file_path):
         df = pd.read_excel(file_path)
         df = df.dropna(subset=['Latitude', 'Longitude'])
         return df
-    except Exception as e:
+    except Exception:
         return pd.DataFrame()
 
-# 4. THUẬT TOÁN TỐI ƯU LỘ TRÌNH MỚI (NEAREST NEIGHBOR VIA OSRM TABLE API)
-def get_optimized_route_v2(origin, points_list):
+# 4. THUẬT TOÁN TỐI ƯU LỘ TRÌNH VÒNG KÍN (ROUND-TRIP: BẮT ĐẦU = KẾT THÚC)
+def get_optimized_route_roundtrip(origin, points_list):
     all_points = [{'Name': 'GPS ORIGIN', 'Latitude': origin[0], 'Longitude': origin[1]}] + points_list
     
-    # Tạo chuỗi tọa độ cho OSRM Table API
+    # Chuỗi tọa độ cho OSRM Table API
     coords_str = ";".join([f"{pt['Longitude']},{pt['Latitude']}" for pt in all_points])
     table_url = f"http://router.project-osrm.org/table/v1/driving/{coords_str}?annotations=duration,distance"
     
@@ -160,9 +160,9 @@ def get_optimized_route_v2(origin, points_list):
         if res.get('code') != 'Ok':
             return None, [], 0, 0
             
-        durations = res['durations'] # Ma trận thời gian giữa các điểm
+        durations = res['durations']
         
-        # Thuật toán Nearest Neighbor tìm chuỗi thứ tự chuẩn
+        # Thuật toán Nearest Neighbor
         unvisited = list(range(1, len(all_points)))
         current_idx = 0
         ordered_indices = []
@@ -173,9 +173,9 @@ def get_optimized_route_v2(origin, points_list):
             unvisited.remove(next_idx)
             current_idx = next_idx
 
-        # Tạo danh sách điểm đã sắp xếp theo thứ tự tối ưu thực tế
+        # Tạo danh sách các điểm ghé thăm
         ordered_points = []
-        route_coords_str = f"{origin[1]},{origin[0]}"
+        route_coords_str = f"{origin[1]},{origin[0]}" # Xuất phát từ Điểm Bắt Đầu
         
         for order, idx in enumerate(ordered_indices, 1):
             pt = all_points[idx]
@@ -187,7 +187,10 @@ def get_optimized_route_v2(origin, points_list):
             })
             route_coords_str += f";{pt['Longitude']},{pt['Latitude']}"
 
-        # Lấy hình tuyến đường chi tiết (Polyline) từ OSRM Route API
+        # NỐI LẠI ĐIỂM XUẤT PHÁT VÀO CUỐI LỘ TRÌNH (BẮT ĐẦU = KẾT THÚC)
+        route_coords_str += f";{origin[1]},{origin[0]}"
+
+        # Lấy tuyến đường khép kín từ OSRM Route API
         route_url = f"http://router.project-osrm.org/route/v1/driving/{route_coords_str}?overview=full&geometries=geojson"
         route_res = requests.get(route_url, timeout=10).json()
         
@@ -228,9 +231,9 @@ with st.sidebar:
     
     options = df['Tên đối tượng'].tolist()
     selected_names = st.multiselect(
-        "🎯 Chọn danh sách tập điểm cần đi (Tối đa 25):",
+        "🎯 Chọn danh sách tập điểm cần đi (Tối đa 15):",
         options=options,
-        max_selections=25,
+        max_selections=15,
         placeholder="Choose options"
     )
     
@@ -263,8 +266,8 @@ with st.sidebar:
             selected_df = df[df['Tên đối tượng'].isin(selected_names)]
             points_list = selected_df.to_dict('records')
             
-            with st.spinner("🤖 Đang tính toán ma trận ma quỷ & tối ưu hóa..."):
-                route_coords, ordered_points, dist_km, dur_min = get_optimized_route_v2(
+            with st.spinner("🤖 Đang tối ưu hóa lộ trình vòng kín..."):
+                route_coords, ordered_points, dist_km, dur_min = get_optimized_route_roundtrip(
                     st.session_state.current_loc, points_list
                 )
                 
@@ -280,7 +283,7 @@ with st.sidebar:
         st.divider()
         st.markdown(f"""
         <div class='hud-card'>
-            <div class='hud-label'>Tổng quãng đường</div>
+            <div class='hud-label'>Tổng quãng đường (Vòng kín)</div>
             <div class='hud-value'>{st.session_state.route_summary['distance']:.2f} KM</div>
             <div class='hud-label' style='margin-top:8px;'>Thời gian di chuyển</div>
             <div class='hud-value'>{st.session_state.route_summary['duration']:.0f} PHÚT</div>
@@ -288,8 +291,10 @@ with st.sidebar:
         """, unsafe_allow_html=True)
         
         st.markdown("<br><b style='color:#ffffff;'>📍 Lộ trình thực thi:</b>", unsafe_allow_html=True)
+        st.markdown("<span style='color:#00f0ff;'>[0] Vị trí xuất phát (GPS CORE)</span>", unsafe_allow_html=True)
         for pt in st.session_state.ordered_points:
             st.markdown(f"<span style='color:#00f0ff;'>[{pt['Order']}]</span> <span style='color:#ffffff;'>{pt['Name']}</span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='color:#00f0ff;'>[{len(st.session_state.ordered_points)+1}]</span> <span style='color:#ffffff;'>Quay về vị trí xuất phát</span>", unsafe_allow_html=True)
 
 # ================= MAIN CONTENT MAP =================
 if st.session_state.current_loc:
@@ -316,8 +321,8 @@ folium.TileLayer(
 if st.session_state.current_loc:
     folium.Marker(
         location=st.session_state.current_loc,
-        popup="<b>Vị trí xuất phát</b>",
-        tooltip="GPS ORIGIN",
+        popup="<b>Vị trí xuất phát & Kết thúc (GPS CORE)</b>",
+        tooltip="GPS ORIGIN & END",
         icon=folium.Icon(color='red', icon='crosshairs', prefix='fa')
     ).add_to(m)
 
@@ -351,7 +356,7 @@ if st.session_state.route_coords:
         color="#00F0FF",
         weight=5,
         opacity=0.9,
-        tooltip="Cyber Route Trajectory"
+        tooltip="Cyber Round-Trip Route"
     ).add_to(m)
 
 folium.LayerControl().add_to(m)
