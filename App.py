@@ -4,8 +4,9 @@ import numpy as np
 import folium
 import requests
 from streamlit_folium import st_folium
+from streamlit_js_eval import get_geolocation
 
-# 1. Cấu hình trang & Styling
+# 1. Cấu hình giao diện
 st.set_page_config(layout="wide", page_title="TQG - Tuyến đường", initial_sidebar_state="expanded")
 
 st.markdown("""
@@ -41,7 +42,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 2. Nạp dữ liệu Excel
+# 2. Load dữ liệu Excel
 @st.cache_data
 def load_data():
     df = pd.read_excel('QuanLyTĐ.xlsx', sheet_name='TĐ')
@@ -51,15 +52,15 @@ def load_data():
 try:
     df = load_data()
 except Exception as e:
-    st.error(f"[SYSTEM ERROR]: Không thể nạp dữ liệu. Chi tiết: {e}")
+    st.error(f"[SYSTEM ERROR]: Không thể nạp dữ liệu: {e}")
     st.stop()
 
-# 3. Thuật toán OSRM tính đường bộ thực tế cho xe máy
+# 3. Hàm tính tuyến đường xe máy thực tế (OSRM Engine)
 def get_osrm_route(coords_list):
     loc_str = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
     url = f"http://router.project-osrm.org/route/v1/driving/{loc_str}?overview=full&geometries=geojson"
     try:
-        res = requests.get(url, timeout=4)
+        res = requests.get(url, timeout=3)
         data = res.json()
         if data.get("code") == "Ok":
             route_geometry = data["routes"][0]["geometry"]["coordinates"]
@@ -68,7 +69,7 @@ def get_osrm_route(coords_list):
         pass
     return coords_list
 
-# 4. Thuật toán TSP tìm chuỗi điểm tối ưu từ điểm xuất phát (index 0)
+# 4. Thuật toán sắp xếp thứ tự lộ trình từ vị trí xuất phát
 def haversine_matrix(coords):
     rads = np.radians(coords)
     lats, lons = rads[:, 0], rads[:, 1]
@@ -94,71 +95,36 @@ def solve_tsp_from_start(selected_df):
         
     return path
 
-# 5. Khởi tạo & Lưu trữ trạng thái không bị mất khi bấm tương tác
-if 'user_lat' not in st.session_state:
-    st.session_state['user_lat'] = None
-if 'user_lon' not in st.session_state:
-    st.session_state['user_lon'] = None
+# 5. Khởi tạo Session State
+if 'user_loc' not in st.session_state:
+    st.session_state['user_loc'] = None
 if 'is_routed' not in st.session_state:
     st.session_state['is_routed'] = False
-
-# Đọc GPS đẩy từ Javascript URL
-query_params = st.query_params
-if "lat" in query_params and "lon" in query_params:
-    try:
-        st.session_state['user_lat'] = float(query_params["lat"])
-        st.session_state['user_lon'] = float(query_params["lon"])
-    except:
-        pass
 
 # 6. Thanh Menu Sidebar
 with st.sidebar:
     st.markdown("<h3 style='color: #27ae60; font-size: 18px; margin-bottom: 2px;'>⚡ TQG - Tuyến đường</h3>", unsafe_allow_html=True)
     st.markdown("<p style='color: #2ab7ca; font-size: 11px; margin-bottom: 15px;'>Make by BangNC13</p>", unsafe_allow_html=True)
-    
-    # Nút bấm lấy GPS điện thoại
-    st.components.v1.html("""
-        <button id="gps_btn" style="
-            width: 100%;
-            background-color: #ff4d4f;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            padding: 10px;
-            font-weight: bold;
-            font-size: 14px;
-            cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-        ">📍 Tôi đang đứng</button>
 
-        <script>
-            document.getElementById('gps_btn').onclick = function() {
-                var btn = this;
-                btn.innerHTML = "⚡ Đang lấy vị trí...";
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(function(position) {
-                        const lat = position.coords.latitude;
-                        const lon = position.coords.longitude;
-                        const url = new URL(window.parent.location.href);
-                        url.searchParams.set('lat', lat);
-                        url.searchParams.set('lon', lon);
-                        window.parent.location.href = url.href;
-                    }, function(error) {
-                        alert("Không lấy được GPS. Vui lòng bật vị trí thiết bị.");
-                        btn.innerHTML = "📍 Tôi đang đứng";
-                    }, { enableHighAccuracy: true, timeout: 5000 });
-                } else {
-                    alert("Trình duyệt không hỗ trợ Geolocation.");
-                }
-            };
-        </script>
-    """, height=50)
+    # Nút bấm lấy vị trí GPS nhanh
+    if st.button("📍 Tôi đang đứng", type="primary"):
+        location = get_geolocation()
+        if location and 'coords' in location:
+            st.session_state['user_loc'] = {
+                'Tên đối tượng': '📍 Vị trí hiện tại của tôi',
+                'Latitude': location['coords']['latitude'],
+                'Longitude': location['coords']['longitude']
+            }
+            st.toast("✅ Đã bắt được tọa độ định vị!")
+        else:
+            st.warning("Đang chờ thiết bị cho phép quyền GPS...")
 
-    if st.session_state['user_lat'] is not None:
-        st.caption("✅ Đã nhận vị trí hiện tại")
+    if st.session_state['user_loc'] is not None:
+        st.caption(f"Đã định vị: {st.session_state['user_loc']['Latitude']:.4f}, {st.session_state['user_loc']['Longitude']:.4f}")
 
     st.markdown("<hr style='margin: 10px 0; border: none; border-top: 1px solid #dcdfe6;'>", unsafe_allow_html=True)
 
+    # Lọc POP
     all_objects = df['Tên đối tượng'].tolist()
     st.markdown("**LỌC DỮ LIỆU POP**")
     selected_names = st.multiselect(
@@ -168,7 +134,7 @@ with st.sidebar:
         label_visibility="collapsed"
     )
 
-    # Đổi style nút "Bấm" duy trì màu xanh dương khi lộ trình đang kích hoạt
+    # Đổi màu xanh dương cho nút "Bấm" khi đã kích hoạt
     if st.session_state['is_routed']:
         st.markdown("""
             <style>
@@ -182,24 +148,19 @@ with st.sidebar:
     
     btn_type = "primary" if st.session_state['is_routed'] else "secondary"
     if st.button("Bấm", type=btn_type):
-        if st.session_state['user_lat'] is None:
-            st.error("Vui lòng nhấn '📍 Tôi đang đứng' để định vị trước!")
+        if st.session_state['user_loc'] is None:
+            st.error("Vui lòng nhấn '📍 Tôi đang đứng' để lấy định vị trước!")
         else:
-            # Khóa trạng thái lộ trình, nhấn lại không bị mất
             st.session_state['is_routed'] = True
             st.rerun()
 
-# 7. Render Bản đồ & Duy trì Tuyến đường
+# 7. Hiển thị Bản đồ
 selected_df = df[df['Tên đối tượng'].isin(selected_names)].reset_index(drop=True)
 
-# Tích hợp vị trí hiện tại làm điểm xuất phát (Index 0)
-if st.session_state['user_lat'] is not None:
-    my_loc_row = pd.DataFrame([{
-        'Tên đối tượng': '📍 Vị trí hiện tại của tôi',
-        'Latitude': st.session_state['user_lat'],
-        'Longitude': st.session_state['user_lon']
-    }])
-    full_df = pd.concat([my_loc_row, selected_df], ignore_index=True)
+# Tích hợp điểm xuất phát
+if st.session_state['user_loc'] is not None:
+    my_row = pd.DataFrame([st.session_state['user_loc']])
+    full_df = pd.concat([my_row, selected_df], ignore_index=True)
 else:
     full_df = selected_df.copy()
 
@@ -216,15 +177,15 @@ m = folium.Map(
 
 m.get_root().html.add_child(folium.Element('<script>L.control.zoom({ position: "bottomright" }).addTo(map);</script>'))
 
-# Trường hợp đã kích hoạt nút "Bấm" -> Giữ nguyên tuyến đường xe máy xuất phát từ vị trí đang đứng
-if st.session_state['is_routed'] and st.session_state['user_lat'] is not None and len(full_df) > 1:
+# Nếu đã nhấn "Bấm": Vẽ tuyến đường và giữ cố định
+if st.session_state['is_routed'] and st.session_state['user_loc'] is not None and len(full_df) > 1:
     path_indices = solve_tsp_from_start(full_df)
     ordered_df = full_df.iloc[path_indices].reset_index(drop=True)
 
     raw_coords = ordered_df[['Latitude', 'Longitude']].values.tolist()
     osrm_route = get_osrm_route(raw_coords)
 
-    # Vẽ tuyến đường PolyLine màu xanh dương
+    # Đường lộ trình xanh dương
     folium.PolyLine(
         osrm_route, 
         color="#007bff", 
@@ -232,7 +193,6 @@ if st.session_state['is_routed'] and st.session_state['user_lat'] is not None an
         opacity=0.85
     ).add_to(m)
 
-    # Hiển thị thứ tự di chuyển 1, 2, 3...
     for idx, row in ordered_df.iterrows():
         seq_num = idx + 1
         is_my_loc = (row['Tên đối tượng'] == '📍 Vị trí hiện tại của tôi')
@@ -251,7 +211,7 @@ if st.session_state['is_routed'] and st.session_state['user_lat'] is not None an
             icon=folium.DivIcon(html=marker_html)
         ).add_to(m)
 
-# Chưa bấm nút "Bấm" -> Chỉ hiển thị vị trí đứng và các POP
+# Khi chưa bấm "Bấm": Chỉ thể hiện Marker các điểm
 else:
     for idx, row in full_df.iterrows():
         is_my_loc = (row['Tên đối tượng'] == '📍 Vị trí hiện tại của tôi')
