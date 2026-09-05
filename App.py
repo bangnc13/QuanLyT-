@@ -7,12 +7,12 @@ from folium.plugins import LocateControl
 from scipy.spatial.distance import cdist
 import urllib.parse
 
-# 1. Cấu hình giao diện tràn màn hình & Phong cách Robotic / Cyberpunk Dark Mode
-st.set_page_config(layout="wide", page_title="Robotic Route HUD", initial_sidebar_state="collapsed")
+# 1. Cấu hình trang full view & Dark Theme Robotic
+st.set_page_config(layout="wide", page_title="Robotic Route HUD", initial_sidebar_state="expanded")
 
 st.markdown("""
     <style>
-        /* Dark Theme & Robotic Style */
+        /* Dark Theme Style */
         .stApp {
             background-color: #0d1117;
             color: #58a6ff;
@@ -21,18 +21,15 @@ st.markdown("""
         .block-container {
             padding: 0.5rem 0.5rem 0rem 0.5rem !important;
         }
-        /* Hide Sidebar Collapse Button & Header elements */
         header {visibility: hidden;}
-        div[data-testid="stSidebar"] {display: none;}
         
-        /* Custom HUD Overlay Styling for Map */
-        .leaflet-control-hud {
-            background: rgba(13, 17, 23, 0.85);
-            border: 1px solid #30363d;
-            box-shadow: 0 0 10px rgba(56, 139, 253, 0.3);
-            border-radius: 6px;
-            padding: 10px 14px;
-            color: #58a6ff;
+        /* Tùy chỉnh Sidebar phong cách Robotic */
+        section[data-testid="stSidebar"] {
+            background-color: #161b22;
+            border-right: 1px solid #30363d;
+        }
+        section[data-testid="stSidebar"] * {
+            color: #c9d1d9 !important;
             font-family: 'Courier New', Courier, monospace;
         }
     </style>
@@ -80,15 +77,24 @@ def solve_tsp(selected_df):
         
     return path, total_dist
 
-# Mặc định tự động chọn 10 điểm đầu tiên để dựng lộ trình
-default_points = df['Tên đối tượng'].head(10).tolist()
-selected_df = df[df['Tên đối tượng'].isin(default_points)].reset_index(drop=True)
+# 4. Thanh Menu điều khiển chọn điểm
+st.sidebar.title("⚙️ CONTROL PANEL")
+all_objects = df['Tên đối tượng'].tolist()
 
-if len(selected_df) >= 2:
+selected_names = st.sidebar.multiselect(
+    "SELECT NODES (Tối thiểu 2 điểm):",
+    options=all_objects,
+    default=all_objects[:10] if len(all_objects) >= 10 else all_objects[:2]
+)
+
+if len(selected_names) < 2:
+    st.warning("[WARNING]: Vui lòng chọn ít nhất 2 đối tượng trên Menu bên cạnh.")
+else:
+    selected_df = df[df['Tên đối tượng'].isin(selected_names)].reset_index(drop=True)
     path_indices, total_km = solve_tsp(selected_df)
     ordered_df = selected_df.iloc[path_indices].reset_index(drop=True)
 
-    # 4. Tạo URL Google Maps lộ trình tổng
+    # 5. Tạo URL Google Maps
     origin = f"{ordered_df.iloc[0]['Latitude']},{ordered_df.iloc[0]['Longitude']}"
     destination = f"{ordered_df.iloc[-1]['Latitude']},{ordered_df.iloc[-1]['Longitude']}"
     waypoints = "|".join([f"{row['Latitude']},{row['Longitude']}" for _, row in ordered_df.iloc[1:-1].iterrows()])
@@ -96,7 +102,7 @@ if len(selected_df) >= 2:
     if waypoints:
         gmaps_full_route_url += f"&waypoints={urllib.parse.quote(waypoints)}"
 
-    # 5. Khởi tạo Bản đồ Google Maps giao diện Vệ tinh / Đêm
+    # 6. Khởi tạo Bản đồ Google Maps Hybrid
     center_lat = ordered_df['Latitude'].mean()
     center_lon = ordered_df['Longitude'].mean()
 
@@ -107,7 +113,7 @@ if len(selected_df) >= 2:
         attr="Google Maps Hybrid"
     )
 
-    # Nút Định vị GPS thiết bị kiểu HUD Cyberpunk
+    # Nút Định vị GPS Cyberpunk
     LocateControl(
         auto_start=False,
         flyTo=True,
@@ -117,7 +123,7 @@ if len(selected_df) >= 2:
         icon_element='<span class="fa fa-crosshairs" style="color: #00ffcc; font-size: 18px;"></span>'
     ).add_to(m)
 
-    # 6. Tạo Bảng điều khiển HUD trực tiếp trên Bản đồ (On-Screen Map Overlay)
+    # 7. Bảng điều khiển HUD trên màn hình Bản đồ
     hud_html = f'''
     <div style="
         position: fixed; 
@@ -155,7 +161,7 @@ if len(selected_df) >= 2:
     '''
     m.get_root().html.add_child(folium.Element(hud_html))
 
-    # 7. Vẽ đường nối Laser Neon giữa các mốc điểm
+    # 8. Vẽ đường nối Laser Neon
     route_coords = ordered_df[['Latitude', 'Longitude']].values.tolist()
     folium.PolyLine(
         route_coords, 
@@ -165,7 +171,7 @@ if len(selected_df) >= 2:
         dash_array='6, 6'
     ).add_to(m)
 
-    # 8. Đánh dấu điểm mốc kiểu Robotic HUD
+    # 9. Marker điểm mốc Robotic HUD
     for idx, row in ordered_df.iterrows():
         seq_num = idx + 1
         direct_gmaps_url = f"https://www.google.com/maps/dir/?api=1&destination={row['Latitude']},{row['Longitude']}"
@@ -228,5 +234,5 @@ if len(selected_df) >= 2:
             icon=folium.DivIcon(html=marker_icon_html)
         ).add_to(m)
 
-    # Hiển thị bản đồ tràn màn hình
+    # Hiển thị bản đồ
     st_folium(m, width="100%", height=850, returned_objects=[])
