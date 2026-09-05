@@ -1,6 +1,7 @@
-pandas
-openpyxl
 streamlit
+pandas
+numpy
 folium
 streamlit-folium
-scipy
+streamlit-js-eval
+openpyxl
