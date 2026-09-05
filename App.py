@@ -4,7 +4,6 @@ import numpy as np
 import folium
 from streamlit_folium import st_folium
 from folium.plugins import LocateControl
-from scipy.spatial.distance import cdist
 import urllib.parse
 
 # 1. Cấu hình trang full view & Dark Theme Robotic
@@ -94,7 +93,7 @@ else:
     path_indices, total_km = solve_tsp(selected_df)
     ordered_df = selected_df.iloc[path_indices].reset_index(drop=True)
 
-    # 5. Tạo URL Google Maps
+    # 5. Tạo URL Google Maps cho toàn bộ lộ trình
     origin = f"{ordered_df.iloc[0]['Latitude']},{ordered_df.iloc[0]['Longitude']}"
     destination = f"{ordered_df.iloc[-1]['Latitude']},{ordered_df.iloc[-1]['Longitude']}"
     waypoints = "|".join([f"{row['Latitude']},{row['Longitude']}" for _, row in ordered_df.iloc[1:-1].iterrows()])
@@ -102,7 +101,7 @@ else:
     if waypoints:
         gmaps_full_route_url += f"&waypoints={urllib.parse.quote(waypoints)}"
 
-    # 6. Khởi tạo Bản đồ Google Maps (Tắt nút zoom mặc định ở góc trên trái)
+    # 6. Khởi tạo Bản đồ Google Maps (Zoom control ở bottomright)
     center_lat = ordered_df['Latitude'].mean()
     center_lon = ordered_df['Longitude'].mean()
 
@@ -169,7 +168,7 @@ else:
     '''
     m.get_root().html.add_child(folium.Element(hud_html))
 
-    # 8. Công cụ Chỉ đường Thông minh trực tiếp trên Map
+    # 8. Công cụ Chỉ đường Thông minh từ Vị trí GPS hiện tại hoặc Chọn điểm
     node_options_js = "".join([f'<option value="{row["Latitude"]},{row["Longitude"]}">#{idx+1}. {row["Tên đối tượng"]}</option>' for idx, row in ordered_df.iterrows()])
     
     routing_hud_html = f'''
@@ -189,31 +188,36 @@ else:
         padding: 12px;
         color: #e6edf3;
         font-family: monospace;
-        width: 280px;
+        width: 300px;
     ">
         <div style="font-size: 12px; font-weight: bold; color: #58a6ff; margin-bottom: 8px;">🧭 ON-MAP SMART ROUTING</div>
+        
         <div style="margin-bottom: 6px;">
             <label style="font-size: 10px; color: #8b949e;">START NODE:</label><br>
             <select id="start_node" style="width: 100%; background: #161b22; color: #00ffcc; border: 1px solid #30363d; padding: 4px; border-radius: 3px; font-family: monospace;">
+                <option value="GPS">📍 MY CURRENT LOCATION (GPS)</option>
                 {node_options_js}
             </select>
         </div>
+        
         <div style="margin-bottom: 10px;">
-            <label style="font-size: 10px; color: #8b949e;">END NODE:</label><br>
+            <label style="font-size: 10px; color: #8b949e;">TARGET DESTINATION:</label><br>
             <select id="end_node" style="width: 100%; background: #161b22; color: #ff7b72; border: 1px solid #30363d; padding: 4px; border-radius: 3px; font-family: monospace;">
                 {node_options_js}
             </select>
         </div>
-        <button onclick="drawLiveRoute()" style="
+        
+        <button onclick="executeRouting()" style="
             width: 100%;
             background: #238636;
             color: white;
             border: none;
-            padding: 6px;
+            padding: 7px;
             border-radius: 3px;
             font-weight: bold;
             font-family: monospace;
             cursor: pointer;
+            box-shadow: 0 0 8px rgba(35, 134, 54, 0.4);
         ">
             ▶ NAVIGATE ON MAP
         </button>
@@ -221,15 +225,8 @@ else:
 
     <script>
         var routingControl = null;
-        function drawLiveRoute() {{
-            var startVal = document.getElementById('start_node').value.split(',');
-            var endVal = document.getElementById('end_node').value.split(',');
-            
-            var startLat = parseFloat(startVal[0]);
-            var startLon = parseFloat(startVal[1]);
-            var endLat = parseFloat(endVal[0]);
-            var endLon = parseFloat(endVal[1]);
 
+        function drawPath(startLat, startLon, endLat, endLon) {{
             if (routingControl !== null) {{
                 map.removeControl(routingControl);
             }}
@@ -247,11 +244,49 @@ else:
                 addWaypoints: false
             }}).addTo(map);
         }}
+
+        function executeRouting() {{
+            var startVal = document.getElementById('start_node').value;
+            var endVal = document.getElementById('end_node').value.split(',');
+            
+            var endLat = parseFloat(endVal[0]);
+            var endLon = parseFloat(endVal[1]);
+
+            if (startVal === "GPS") {{
+                if (navigator.geolocation) {{
+                    navigator.geolocation.getCurrentPosition(function(position) {{
+                        var userLat = position.coords.latitude;
+                        var userLon = position.coords.longitude;
+                        
+                        // Vẽ marker vị trí của người dùng
+                        L.circleMarker([userLat, userLon], {{
+                            radius: 8,
+                            fillColor: "#00ffcc",
+                            color: "#ffffff",
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.9
+                        }}).addTo(map).bindPopup("📍 YOUR LOCATION").openPopup();
+
+                        drawPath(userLat, userLon, endLat, endLon);
+                    }}, function(error) {{
+                        alert("[GPS ERROR]: Không thể lấy vị trí thiết bị. Vui lòng bật vị trí GPS trên trình duyệt/điện thoại.");
+                    }});
+                }} else {{
+                    alert("[ERROR]: Trình duyệt không hỗ trợ Geolocation.");
+                }}
+            }} else {{
+                var startCoords = startVal.split(',');
+                var startLat = parseFloat(startCoords[0]);
+                var startLon = parseFloat(startCoords[1]);
+                drawPath(startLat, startLon, endLat, endLon);
+            }}
+        }}
     </script>
     '''
     m.get_root().html.add_child(folium.Element(routing_hud_html))
 
-    # 9. Đường nối lộ trình
+    # 9. Đường nối tổng thể
     route_coords = ordered_df[['Latitude', 'Longitude']].values.tolist()
     folium.PolyLine(
         route_coords, 
@@ -261,7 +296,7 @@ else:
         dash_array='6, 6'
     ).add_to(m)
 
-    # 10. Marker điểm mốc
+    # 10. Marker các điểm mốc
     for idx, row in ordered_df.iterrows():
         seq_num = idx + 1
         direct_gmaps_url = f"https://www.google.com/maps/dir/?api=1&destination={row['Latitude']},{row['Longitude']}"
@@ -294,7 +329,7 @@ else:
                 font-size: 11px;
                 font-weight: bold;
             ">
-                🧭 NAVIGATE TO NODE (GMAPS)
+                🧭 NAVIGATE VIA GMAPS
             </a>
         </div>
         """
