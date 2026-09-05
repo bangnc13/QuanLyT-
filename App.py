@@ -14,8 +14,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Inject CSS Custom (Bo tròn viền NEON CAM cho nút Toggle Sidebar)
-st.markdown("""
+# 2. Inject CSS Custom (Sử dụng Raw String r""" để tránh lỗi Syntax)
+custom_css = r"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
 
@@ -94,18 +94,4 @@ st.markdown("""
         text-align: center;
         text-transform: uppercase;
         letter-spacing: 2px;
-        text-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
-        margin-top: 15px;
-        margin-bottom: 20px;
-    }
-
-    div.stButton > button {
-        font-family: 'Orbitron', sans-serif !important;
-        font-weight: 700 !important;
-        color: #000000 !important;
-        background: linear-gradient(135deg, #00f0ff 0%, #7000ff 100%) !important;
-        border: none !important;
-        border-radius: 4px !important;
-        padding: 12px 24px !important;
-        text-transform: uppercase !important;
-        letter-spacing:
+        text-shadow: 0 0 10px
