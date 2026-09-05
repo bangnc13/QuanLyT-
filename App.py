@@ -46,7 +46,7 @@ class MapApp(QMainWindow):
         lbl_select = QLabel("<b>Chọn tập điểm cần đến:</b>")
         left_panel.addWidget(lbl_select)
         
-        # Danh sách chọn điểm (Cho phép chọn nhiều điểm nếu muốn)
+        # Danh sách chọn điểm
         self.list_widget = QListWidget()
         self.list_widget.setSelectionMode(QAbstractItemView.MultiSelection)
         self.populate_list()
@@ -87,7 +87,7 @@ class MapApp(QMainWindow):
             self.list_widget.addItem(item_text)
 
     def get_current_location(self):
-        """Lấy vị trí hiện tại dựa trên IP public (hoặc tọa độ mặc định nếu lỗi)"""
+        """Lấy vị trí hiện tại dựa trên IP public"""
         try:
             res = requests.get('https://ipinfo.io/json', timeout=5).json()
             if 'loc' in res:
@@ -99,7 +99,7 @@ class MapApp(QMainWindow):
         except Exception:
             pass
         
-        # Nếu không lấy được IP, lấy vị trí trung bình của tập điểm làm mốc giả định
+        # Nếu không lấy được IP, lấy vị trí trung bình của tập điểm làm mốc
         if not self.df.empty:
             avg_lat = self.df['Latitude'].mean()
             avg_lon = self.df['Longitude'].mean()
@@ -114,7 +114,6 @@ class MapApp(QMainWindow):
             res = requests.get(url, timeout=5).json()
             if res.get('code') == 'Ok':
                 coords = res['routes'][0]['geometry']['coordinates']
-                # OSRM trả về [lon, lat], cần chuyển sang [lat, lon] cho Folium
                 return [(lat, lon) for lon, lat in coords]
         except Exception as e:
             print(f"Lỗi lấy lộ trình: {e}")
@@ -122,14 +121,12 @@ class MapApp(QMainWindow):
 
     def render_map(self, route_coords=None, selected_points=None):
         """Tạo bản đồ Folium với Layer Google Maps"""
-        # Xác định trung tâm bản đồ
         start_center = [21.817, 105.207]
         if self.current_location:
             start_center = self.current_location
         elif not self.df.empty:
             start_center = [self.df['Latitude'].iloc[0], self.df['Longitude'].iloc[0]]
 
-        # Tạo map
         m = folium.Map(location=start_center, zoom_start=14)
 
         # Layer Google Maps Đường Phố
@@ -179,13 +176,12 @@ class MapApp(QMainWindow):
 
         folium.LayerControl().add_to(m)
 
-        # Lưu file HTML tạm và load vào QWebEngineView
         map_path = os.path.abspath("temp_map.html")
         m.save(map_path)
         self.web_view.setUrl(QUrl.fromLocalFile(map_path))
 
     def generate_route(self):
-        """Xử lý khi bấm nút "Bấm""""
+        """Xử lý khi bấm nút Bấm"""
         if not self.current_location:
             QMessageBox.warning(self, "Cảnh báo", "Vui lòng bấm 'Lấy vị trí hiện tại' trước!")
             return
@@ -195,16 +191,10 @@ class MapApp(QMainWindow):
             QMessageBox.warning(self, "Cảnh báo", "Vui lòng chọn ít nhất 1 tập điểm trong danh sách!")
             return
 
-        # Lấy danh sách điểm được chọn
         selected_points = self.df.iloc[selected_indexes].to_dict('records')
-        
-        # Lấy điểm đầu tiên được chọn làm điểm đến
         destination = (selected_points[0]['Latitude'], selected_points[0]['Longitude'])
         
-        # Tìm đường bằng OSRM
         route_coords = self.get_osrm_route(self.current_location, destination)
-        
-        # Vẽ lại bản đồ với tuyến đường
         self.render_map(route_coords=route_coords, selected_points=selected_points)
 
 if __name__ == '__main__':
