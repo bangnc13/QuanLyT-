@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 import folium
 from streamlit_folium import st_folium
-from streamlit_js_eval import get_geolocation, streamlit_js_eval
+from streamlit_js_eval import get_geolocation
 
 # 1. Cấu hình trang Full-Width
 st.set_page_config(
@@ -13,63 +13,75 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. CSS Tối ưu giao diện - An toàn, không vỡ layout
+# 2. Inject CSS Custom: Theme Nền Cam Robotic & Layout Full Edge
 st.markdown("""
 <style>
+    /* Nhập font Cyberpunk / Sci-Fi */
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
 
-    /* Ẩn Header, Footer mặc định của Streamlit */
-    header, footer, [data-testid="stHeader"] {
-        display: none !important;
-    }
-
-    /* Đổi màu nền toàn ứng dụng */
-    .stApp {
-        background-color: #120700 !important;
-    }
-
-    /* Loại bỏ hoàn toàn Margin/Padding của Main Container để bản đồ tràn sát cạnh */
-    .main .block-container {
-        padding: 0 !important;
-        margin: 0 !important;
+    /* Bỏ hoàn toàn Padding khu vực Main Content */
+    .block-container {
+        padding-top: 0rem !important;
+        padding-bottom: 0rem !important;
+        padding-left: 0rem !important;
+        padding-right: 0rem !important;
         max-width: 100% !important;
     }
 
-    /* Ép văn bản hiển thị rõ màu TRẮNG */
-    p, span, label, h1, h2, h3, h4, h5, h6 {
+    /* Đổi nền chính toàn ứng dụng sang màu Cam Tối / Cam Cyberpunk */
+    .stApp {
+        background-color: #1a0a00 !important;
+    }
+
+    /* Ép tất cả văn bản thường thành màu TRẮNG */
+    html, body, [class*="css"], .stMarkdown, p, span, label, div {
         color: #ffffff !important;
     }
 
-    /* Tối ưu Sidebar */
+    /* ========================================================= */
+    /* ĐỔI MÀU CHỮ TRONG Ô MULTISELECT SANG MÀU XANH DƯƠNG       */
+    /* ========================================================= */
+    
+    /* 1. Chữ của các thẻ (tags) đã được chọn trong ô multiselect */
+    [data-baseweb="tag"] span {
+        color: #007bff !important; /* Blue */
+        font-weight: bold !important;
+    }
+
+    /* 2. Chữ hiển thị khi bấm mở danh sách thả xuống (Dropdown menu) */
+    [data-baseweb="menu"] span, 
+    [data-baseweb="menu"] div,
+    li[role="option"] {
+        color: #007bff !important; /* Blue */
+    }
+
+    /* 3. Chữ placeholder (khi chưa chọn gì) hoặc input nhập liệu trong ô multiselect */
+    [data-baseweb="select"] input,
+    [data-baseweb="select"] input::placeholder {
+        color: #007bff !important; /* Blue */
+    }
+    /* ========================================================= */
+
+    /* Tối ưu nền Sidebar dạng Dark Orange Robotic Gradient */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #2b1100 0%, #170900 100%) !important;
+        background: linear-gradient(180deg, #331400 0%, #1f0c00 100%) !important;
         border-right: 2px solid #ff6600 !important;
-        box-shadow: 4px 0px 15px rgba(255, 102, 0, 0.3) !important;
+        box-shadow: 5px 0px 15px rgba(255, 102, 0, 0.4) !important;
     }
 
-    /* Khắc phục lỗi đường kẻ ngang st.divider() bị kéo dài / vỡ layout */
-    [data-testid="stSidebar"] hr {
-        border: none !important;
-        border-top: 1px solid #ff6600 !important;
-        opacity: 0.4 !important;
-        margin: 12px 0 !important;
-        width: 100% !important;
-    }
-
-    /* Style Tiêu đề Sidebar */
+    /* Style Tiêu đề Sidebar - Giữ màu Cyan Neon nổi bật trên nền cam */
     .robot-title {
         font-family: 'Orbitron', sans-serif;
         color: #00f0ff !important;
         text-align: center;
         text-transform: uppercase;
-        letter-spacing: 1.5px;
-        text-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
-        margin-top: 10px;
-        margin-bottom: 15px;
-        font-size: 1.3rem;
+        letter-spacing: 2px;
+        text-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
+        margin-top: 15px;
+        margin-bottom: 20px;
     }
 
-    /* Nút bấm Robotic Cyberpunk */
+    /* Nút bấm kiểu ROBOTIC CYBERPUNK - Giữ nguyên Gradient Neon */
     div.stButton > button {
         font-family: 'Orbitron', sans-serif !important;
         font-weight: 700 !important;
@@ -77,46 +89,56 @@ st.markdown("""
         background: linear-gradient(135deg, #00f0ff 0%, #7000ff 100%) !important;
         border: none !important;
         border-radius: 4px !important;
-        padding: 10px 20px !important;
+        padding: 12px 24px !important;
         text-transform: uppercase !important;
-        letter-spacing: 1px !important;
+        letter-spacing: 1.5px !important;
+        clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%);
         transition: all 0.3s ease-in-out !important;
-        box-shadow: 0 0 12px rgba(0, 240, 255, 0.4) !important;
+        box-shadow: 0 0 15px rgba(0, 240, 255, 0.4) !important;
     }
 
     div.stButton > button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 0 20px rgba(0, 240, 255, 0.8) !important;
+        transform: scale(1.03) translateY(-2px) !important;
+        box-shadow: 0 0 25px rgba(0, 240, 255, 0.8), 0 0 10px rgba(112, 0, 255, 0.8) !important;
         color: #ffffff !important;
     }
 
-    /* Card hiển thị chỉ số HUD */
+    /* Container hiển thị thông số dạng HUD display - Nền Cam Đen */
     .hud-card {
-        background: rgba(43, 17, 0, 0.8) !important;
+        background: rgba(51, 20, 0, 0.85) !important;
         border: 1px solid #ff6600 !important;
         border-left: 4px solid #00f0ff !important;
-        border-radius: 4px;
-        padding: 10px;
-        margin-top: 8px;
+        border-radius: 6px;
+        padding: 12px;
+        margin-top: 10px;
+        box-shadow: inset 0 0 10px rgba(255, 102, 0, 0.2);
         font-family: 'Rajdhani', sans-serif;
     }
 
+    /* Nhãn chữ thường - Màu TRẮNG */
     .hud-label {
-        color: #d0d0d0 !important;
-        font-size: 0.8rem;
+        color: #ffffff !important;
+        font-size: 0.85rem;
         text-transform: uppercase;
     }
 
+    /* Giá trị thông số - Giữ màu Cyan Neon */
     .hud-value {
         color: #00f0ff !important;
-        font-size: 1.2rem;
+        font-size: 1.3rem;
         font-weight: bold;
         font-family: 'Orbitron', sans-serif;
+    }
+
+    /* Divider phong cách Laser line Cam Neon */
+    hr {
+        border-color: #ff6600 !important;
+        opacity: 0.5;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Đọc dữ liệu từ file Excel
+# 3. Hàm nạp dữ liệu
 @st.cache_data
 def load_data(file_path):
     try:
@@ -124,9 +146,10 @@ def load_data(file_path):
         df = df.dropna(subset=['Latitude', 'Longitude'])
         return df
     except Exception as e:
+        st.error(f"Lỗi đọc file: {e}")
         return pd.DataFrame()
 
-# 4. Hàm lấy đường đi từ OSRM
+# 4. OSRM Route Optimization
 def get_optimized_route(origin, points_list):
     coords_str = f"{origin[1]},{origin[0]}"
     for pt in points_list:
@@ -158,8 +181,8 @@ def get_optimized_route(origin, points_list):
             
             ordered_points.sort(key=lambda x: x['Order'])
             return route_coords, ordered_points, trip['distance'] / 1000.0, trip['duration'] / 60.0
-    except Exception:
-        pass
+    except Exception as e:
+        st.error(f"Lỗi kết nối OSRM API: {e}")
         
     return None, [], 0, 0
 
@@ -167,6 +190,7 @@ def get_optimized_route(origin, points_list):
 df = load_data('QuanLyTĐ.xlsx')
 
 if df.empty:
+    st.warning("⚠️ Không tìm thấy dữ liệu từ QuanLyTĐ.xlsx. Đang sử dụng dữ liệu giả lập mẫu.")
     df = pd.DataFrame({
         'Tên đối tượng': ['Điểm A', 'Điểm B', 'Điểm C'],
         'Latitude': [21.0285, 21.0350, 21.0200],
@@ -182,25 +206,22 @@ if 'ordered_points' not in st.session_state:
 if 'route_summary' not in st.session_state:
     st.session_state.route_summary = None
 
-# Lấy chiều cao thực tế của màn hình trình duyệt (mặc định 900 nếu chưa bắt được)
-window_height = streamlit_js_eval(js_expressions='window.innerHeight', key='viewport_height')
-map_height = window_height if window_height and window_height > 200 else 900
-
-# ================= SIDEBAR =================
+# ================= SIDEBAR (ROBOTIC CONTROL CENTER) =================
 with st.sidebar:
-    st.markdown("<h3 class='robot-title'>🤖 MAKE BY BANGNC13</h3>", unsafe_allow_html=True)
+    st.markdown("<h2 class='robot-title'>🤖 Make By BangNC13</h2>", unsafe_allow_html=True)
+    st.caption("")
     
-    # Select target points
+    # 1. Chọn điểm
     options = df['Tên đối tượng'].tolist()
     selected_names = st.multiselect(
-        "🎯 Danh sách tập điểm target:",
+        "🎯 Chọn danh sách tập điểm cần đi :",
         options=options,
-        help="Chọn các điểm mục tiêu cần di chuyển"
+        help="Chọn các mục tiêu cần quét lộ trình"
     )
     
     st.divider()
     
-    # Định vị GPS
+    # 2. Định vị GPS
     st.markdown("<div class='hud-label'>📡 Trạng thái định vị GPS:</div>", unsafe_allow_html=True)
     loc_data = get_geolocation()
     
@@ -210,26 +231,26 @@ with st.sidebar:
         st.session_state.current_loc = (lat, lon)
         st.markdown(f"""
         <div class='hud-card'>
-            <div class='hud-label'>Tọa độ GPS hiện tại</div>
+            <div class='hud-label'>Tọa độ hiện tại</div>
             <div class='hud-value'>{lat:.4f}, {lon:.4f}</div>
         </div>
         """, unsafe_allow_html=True)
     else:
-        st.info("Đang quét tín hiệu GPS...")
+        st.info("Bật GPS thiết bị để xác định điểm gốc.")
 
     st.divider()
 
-    # Nút bấm hành động
-    if st.button("⚡ TỐI ƯU LỘ TRÌNH ⚡", use_container_width=True):
+    # 3. Nút kích hoạt lộ trình
+    if st.button("⚡ Bấm xem lộ trình ⚡", use_container_width=True):
         if not st.session_state.current_loc:
-            st.error("Chưa xác định được GPS xuất phát!")
+            st.error("Chưa có tín hiệu GPS!")
         elif not selected_names:
-            st.error("Hãy chọn ít nhất 1 điểm mục tiêu!")
+            st.error("Chưa chọn mục tiêu!")
         else:
             selected_df = df[df['Tên đối tượng'].isin(selected_names)]
             points_list = selected_df.to_dict('records')
             
-            with st.spinner("🤖 Đang tính toán lộ trình tối ưu..."):
+            with st.spinner("🤖 Đang tính toán ma trận khoảng cách..."):
                 route_coords, ordered_points, dist_km, dur_min = get_optimized_route(
                     st.session_state.current_loc, points_list
                 )
@@ -242,31 +263,31 @@ with st.sidebar:
                         'duration': dur_min
                     }
 
-    # Hiển thị kết quả tính toán
+    # Hiển thị HUD kết quả
     if st.session_state.route_summary:
         st.divider()
         st.markdown(f"""
         <div class='hud-card'>
-            <div class='hud-label'>Tổng khoảng cách</div>
+            <div class='hud-label'>Tổng quãng đường</div>
             <div class='hud-value'>{st.session_state.route_summary['distance']:.2f} KM</div>
-            <div class='hud-label' style='margin-top:6px;'>Thời gian dự kiến</div>
+            <div class='hud-label' style='margin-top:8px;'>Thời gian di chuyển</div>
             <div class='hud-value'>{st.session_state.route_summary['duration']:.0f} PHÚT</div>
         </div>
         """, unsafe_allow_html=True)
         
-        st.markdown("<br><b style='color:#ffffff;'>📍 Lộ trình di chuyển:</b>", unsafe_allow_html=True)
+        st.markdown("<br><b style='color:#ffffff;'>📍 Lộ trình thực thi:</b>", unsafe_allow_html=True)
         for pt in st.session_state.ordered_points:
-            st.markdown(f"<span style='color:#00f0ff;'>[{pt['Order']}]</span> {pt['Name']}", unsafe_allow_html=True)
+            st.markdown(f"<span style='color:#00f0ff;'>[{pt['Order']}]</span> <span style='color:#ffffff;'>{pt['Name']}</span>", unsafe_allow_html=True)
 
-# ================= MAIN BẢN ĐỒ FULL MÀN HÌNH =================
+# ================= HIỂN THỊ BẢN ĐỒ FULL CẠNH VIỀN (MAIN CONTENT) =================
 if st.session_state.current_loc:
     map_center = st.session_state.current_loc
 else:
     map_center = [df['Latitude'].mean(), df['Longitude'].mean()]
 
-m = folium.Map(location=map_center, zoom_start=14, tiles=None)
+m = folium.Map(location=map_center, zoom_start=15, tiles=None)
 
-# Nền bản đồ Google
+# Google Maps Tile Layers
 folium.TileLayer(
     tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
     attr='Google Maps',
@@ -281,51 +302,51 @@ folium.TileLayer(
     overlay=False
 ).add_to(m)
 
-# Marker Vị trí GPS hiện tại
+# 1. Đánh dấu GPS xuất phát
 if st.session_state.current_loc:
     folium.Marker(
         location=st.session_state.current_loc,
-        popup="<b>Vị trí hiện tại (GPS Origin)</b>",
+        popup="<b style='color:#000000;'>Vị trí xuất phát (GPS CORE)</b>",
         tooltip="GPS ORIGIN",
         icon=folium.Icon(color='red', icon='crosshairs', prefix='fa')
     ).add_to(m)
 
-# Marker các điểm đến (Cyber styling)
+# 2. Điểm ghé thăm Cyber Matrix Marker
 if st.session_state.ordered_points:
     for pt in st.session_state.ordered_points:
         folium.Marker(
             location=(pt['Latitude'], pt['Longitude']),
-            popup=f"<b>Điểm {pt['Order']}: {pt['Name']}</b>",
-            tooltip=f"[{pt['Order']}] {pt['Name']}",
+            popup=f"<b style='color:#000000;'>Điểm {pt['Order']}: {pt['Name']}</b>",
+            tooltip=f"TARGET [{pt['Order']}]: {pt['Name']}",
             icon=folium.DivIcon(
                 html=f"""<div style="
                     background: linear-gradient(135deg, #00f0ff 0%, #7000ff 100%);
                     color: white;
                     border-radius: 50%;
-                    width: 30px;
-                    height: 30px;
+                    width: 32px;
+                    height: 32px;
                     display: flex;
                     justify-content: center;
                     align-items: center;
-                    font-weight: bold;
+                    font-weight: 900;
                     font-family: 'Orbitron', sans-serif;
                     border: 2px solid #ffffff;
-                    box-shadow: 0 0 10px rgba(0, 240, 255, 0.8);
+                    box-shadow: 0 0 12px rgba(0, 240, 255, 0.9);
                 ">{pt['Order']}</div>"""
             )
         ).add_to(m)
 
-# Vẽ đường nối lộ trình Neon
+# 3. Polyline Cyber Neon
 if st.session_state.route_coords:
     folium.PolyLine(
         st.session_state.route_coords,
         color="#00F0FF",
-        weight=5,
+        weight=6,
         opacity=0.9,
-        tooltip="Cyber Route Line"
+        tooltip="Cyber Route Trajectory"
     ).add_to(m)
 
 folium.LayerControl().add_to(m)
 
-# Hiển thị bản đồ tràn full cạnh dưới chuẩn theo chiều cao màn hình
-st_folium(m, use_container_width=True, height=map_height)
+# Render Map 100% VH
+st_folium(m, width="100%", height=920)
