@@ -1,23 +1,13 @@
-import streamlit as st
-import pandas as pd
-import requests
-import folium
-from streamlit_folium import st_folium
-from streamlit_js_eval import get_geolocation
-
-# 1. Cấu hình trang Full-Width
-st.set_page_config(
-    page_title="Hệ Thống Tối Ưu Lộ Trình - Robotic UI",
-    page_icon="🤖",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
 # 2. Inject CSS Custom: Robotic Theme & Layout Full Edge
 st.markdown("""
 <style>
     /* Nhập font Cyberpunk / Sci-Fi */
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
+
+    /* Đổi màu tất cả chữ văn bản mặc định sang MÀU TRẮNG */
+    html, body, [class*="css"], .stApp, p, span, label, div {
+        color: #ffffff !important;
+    }
 
     /* Bỏ hoàn toàn Padding khu vực Main Content để Map tràn viền */
     .block-container {
@@ -38,7 +28,7 @@ st.markdown("""
     /* Style Tiêu đề Sidebar */
     .robot-title {
         font-family: 'Orbitron', sans-serif;
-        color: #00f0ff;
+        color: #00f0ff !important;
         text-align: center;
         text-transform: uppercase;
         letter-spacing: 2px;
@@ -82,13 +72,13 @@ st.markdown("""
     }
 
     .hud-label {
-        color: #88a0c0;
+        color: #ffffff !important;
         font-size: 0.85rem;
         text-transform: uppercase;
     }
 
     .hud-value {
-        color: #00f0ff;
+        color: #00f0ff !important;
         font-size: 1.3rem;
         font-weight: bold;
         font-family: 'Orbitron', sans-serif;
@@ -101,216 +91,3 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
-# 3. Hàm nạp dữ liệu
-@st.cache_data
-def load_data(file_path):
-    try:
-        df = pd.read_excel(file_path)
-        df = df.dropna(subset=['Latitude', 'Longitude'])
-        return df
-    except Exception as e:
-        st.error(f"Lỗi đọc file: {e}")
-        return pd.DataFrame()
-
-# 4. OSRM Route Optimization
-def get_optimized_route(origin, points_list):
-    coords_str = f"{origin[1]},{origin[0]}"
-    for pt in points_list:
-        coords_str += f";{pt['Longitude']},{pt['Latitude']}"
-
-    url = f"http://router.project-osrm.org/trip/v1/driving/{coords_str}?overview=full&geometries=geojson&source=first&roundtrip=false"
-    
-    try:
-        res = requests.get(url, timeout=10).json()
-        if res.get('code') == 'Ok':
-            trip = res['trips'][0]
-            waypoints = res['waypoints']
-            
-            route_coords = [(lat, lon) for lon, lat in trip['geometry']['coordinates']]
-            
-            ordered_points = []
-            for wp in waypoints:
-                idx = wp['waypoint_index']
-                if idx == 0:
-                    continue
-                
-                pt_info = points_list[idx - 1]
-                ordered_points.append({
-                    'Name': pt_info['Tên đối tượng'],
-                    'Latitude': pt_info['Latitude'],
-                    'Longitude': pt_info['Longitude'],
-                    'Order': len(ordered_points) + 1
-                })
-            
-            ordered_points.sort(key=lambda x: x['Order'])
-            return route_coords, ordered_points, trip['distance'] / 1000.0, trip['duration'] / 60.0
-    except Exception as e:
-        st.error(f"Lỗi kết nối OSRM API: {e}")
-        
-    return None, [], 0, 0
-
-# Khởi tạo dữ liệu
-df = load_data('QuanLyTĐ.xlsx')
-
-if df.empty:
-    st.warning("⚠️ Không tìm thấy dữ liệu từ QuanLyTĐ.xlsx. Đang sử dụng dữ liệu giả lập mẫu.")
-    df = pd.DataFrame({
-        'Tên đối tượng': ['Điểm A', 'Điểm B', 'Điểm C'],
-        'Latitude': [21.0285, 21.0350, 21.0200],
-        'Longitude': [105.8542, 105.8400, 105.8600]
-    })
-
-if 'current_loc' not in st.session_state:
-    st.session_state.current_loc = None
-if 'route_coords' not in st.session_state:
-    st.session_state.route_coords = None
-if 'ordered_points' not in st.session_state:
-    st.session_state.ordered_points = []
-if 'route_summary' not in st.session_state:
-    st.session_state.route_summary = None
-
-# ================= SIDEBAR (ROBOTIC CONTROL CENTER) =================
-with st.sidebar:
-    st.markdown("<h2 class='robot-title'>🤖 Make By BangNC13</h2>", unsafe_allow_html=True)
-    st.caption("")
-    
-    # 1. Chọn điểm
-    options = df['Tên đối tượng'].tolist()
-    selected_names = st.multiselect(
-        "🎯 Chọn tập điểm cần đi:",
-        options=options,
-        help="Chọn các mục tiêu cần quét lộ trình"
-    )
-    
-    st.divider()
-    
-    # 2. Định vị GPS
-    st.markdown("<div class='hud-label'>📡 Trạng thái định vị GPS:</div>", unsafe_allow_html=True)
-    loc_data = get_geolocation()
-    
-    if loc_data and 'coords' in loc_data:
-        lat = loc_data['coords']['latitude']
-        lon = loc_data['coords']['longitude']
-        st.session_state.current_loc = (lat, lon)
-        st.markdown(f"""
-        <div class='hud-card'>
-            <div class='hud-label'>Tọa độ hiện tại</div>
-            <div class='hud-value'>{lat:.4f}, {lon:.4f}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.info("Bật GPS thiết bị để xác định điểm gốc.")
-
-    st.divider()
-
-    # 3. Nút kích hoạt lộ trình phong cách Robotic
-    if st.button("⚡ Bấm xem lộ trình ⚡", use_container_width=True):
-        if not st.session_state.current_loc:
-            st.error("Chưa có tín hiệu GPS!")
-        elif not selected_names:
-            st.error("Chưa chọn mục tiêu!")
-        else:
-            selected_df = df[df['Tên đối tượng'].isin(selected_names)]
-            points_list = selected_df.to_dict('records')
-            
-            with st.spinner("🤖 Đang tính toán ma trận khoảng cách..."):
-                route_coords, ordered_points, dist_km, dur_min = get_optimized_route(
-                    st.session_state.current_loc, points_list
-                )
-                
-                if route_coords:
-                    st.session_state.route_coords = route_coords
-                    st.session_state.ordered_points = ordered_points
-                    st.session_state.route_summary = {
-                        'distance': dist_km,
-                        'duration': dur_min
-                    }
-
-    # Hiển thị HUD kết quả
-    if st.session_state.route_summary:
-        st.divider()
-        st.markdown(f"""
-        <div class='hud-card'>
-            <div class='hud-label'>Tổng quãng đường</div>
-            <div class='hud-value'>{st.session_state.route_summary['distance']:.2f} KM</div>
-            <div class='hud-label' style='margin-top:8px;'>Thời gian di chuyển</div>
-            <div class='hud-value'>{st.session_state.route_summary['duration']:.0f} PHÚT</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("<br><b>📍 Lộ trình thực thi:</b>", unsafe_allow_html=True)
-        for pt in st.session_state.ordered_points:
-            st.markdown(f"<span style='color:#00f0ff;'>[{pt['Order']}]</span> {pt['Name']}", unsafe_allow_html=True)
-
-# ================= HIỂN THỊ BẢN ĐỒ FULL CẠNH VIỀN (MAIN CONTENT) =================
-if st.session_state.current_loc:
-    map_center = st.session_state.current_loc
-else:
-    map_center = [df['Latitude'].mean(), df['Longitude'].mean()]
-
-m = folium.Map(location=map_center, zoom_start=15, tiles=None)
-
-# Neon Dark Tile / Standard Satellite layer
-folium.TileLayer(
-    tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-    attr='Google Maps',
-    name='Google Street',
-    overlay=False
-).add_to(m)
-
-folium.TileLayer(
-    tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-    attr='Google Satellite',
-    name='Google Satellite',
-    overlay=False
-).add_to(m)
-
-# 1. Đánh dấu GPS xuất phát (Icon Robotic)
-if st.session_state.current_loc:
-    folium.Marker(
-        location=st.session_state.current_loc,
-        popup="<b>Vị trí xuất phát (GPS CORE)</b>",
-        tooltip="GPS ORIGIN",
-        icon=folium.Icon(color='red', icon='crosshairs', prefix='fa')
-    ).add_to(m)
-
-# 2. Điểm ghé thăm phong cách Cyber Matrix Marker
-if st.session_state.ordered_points:
-    for pt in st.session_state.ordered_points:
-        folium.Marker(
-            location=(pt['Latitude'], pt['Longitude']),
-            popup=f"<b>Điểm {pt['Order']}: {pt['Name']}</b>",
-            tooltip=f"TARGET [{pt['Order']}]: {pt['Name']}",
-            icon=folium.DivIcon(
-                html=f"""<div style="
-                    background: linear-gradient(135deg, #00f0ff 0%, #7000ff 100%);
-                    color: white;
-                    border-radius: 50%;
-                    width: 32px;
-                    height: 32px;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    font-weight: 900;
-                    font-family: 'Orbitron', sans-serif;
-                    border: 2px solid #ffffff;
-                    box-shadow: 0 0 12px rgba(0, 240, 255, 0.9);
-                ">{pt['Order']}</div>"""
-            )
-        ).add_to(m)
-
-# 3. Polyline Cyber Neon
-if st.session_state.route_coords:
-    folium.PolyLine(
-        st.session_state.route_coords,
-        color="#00F0FF",
-        weight=6,
-        opacity=0.9,
-        tooltip="Cyber Route Trajectory"
-    ).add_to(m)
-
-folium.LayerControl().add_to(m)
-
-# Render Map 100% VH (Tràn toàn bộ màn hình còn lại trừ Sidebar)
-st_folium(m, width="100%", height=920)
