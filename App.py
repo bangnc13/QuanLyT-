@@ -7,7 +7,7 @@ import streamlit.components.v1 as components
 
 # 1. Cấu hình trang Streamlit
 st.set_page_config(
-    page_title="TQG - Xác Định Vị Trí Đứt Cáp",
+    page_title="TQG - Tuyến đường thu cước",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -74,7 +74,6 @@ st.markdown("""
             display: block !important;
         }
         
-        /* Dark Theme cho Input / Selectbox */
         div[data-baseweb="select"] > div {
             background-color: #0F172A !important;
             color: #F8FAFC !important;
@@ -141,7 +140,6 @@ if df is not None:
         df['POP'] = df['Tên đoạn cáp'].apply(lambda x: str(x).split('.')[0] if '.' in str(x) else str(x))
         pop_list = sorted(df['POP'].unique())
         
-        # Multiselect Lọc POP + Nút Reset Bộ Lọc
         selected_pops = st.sidebar.multiselect(
             "LỌC DỮ LIỆU POP", 
             options=pop_list, 
@@ -268,7 +266,7 @@ if df is not None:
             gmap_url = f"https://www.google.com/maps?q={gps[0]},{gps[1]}"
             st.sidebar.link_button("📍 Mở trên Google Maps", gmap_url, type="primary", use_container_width=True)
 
-    # 2. Dữ liệu Bản đồ
+    # Dữ liệu Bản đồ
     map_center = [21.0285, 105.8542]
     zoom_lvl = 12
 
@@ -353,7 +351,12 @@ if df is not None:
                 "radius": 4
             })
 
-    # 3. Leaflet HTML - Tinh chỉnh Dark Mode & Bắt GPS Siêu Nhanh
+    # Leaflet HTML - Chuẩn hóa toàn bộ ngoặc nhọn JS/CSS dạng {{ }}
+    polylines_json = json.dumps(polylines)
+    markers_json = json.dumps(markers)
+    break_marker_json = json.dumps(break_marker)
+    map_center_json = json.dumps(map_center)
+
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -370,8 +373,6 @@ if df is not None:
             #map {{
                 width: 100%; height: 100vh; background: #0E1117;
             }}
-            
-            /* Dark Theme cho Map Controls */
             .leaflet-control-layers, .leaflet-bar {{
                 background-color: #1E293B !important;
                 border: 1px solid #334155 !important;
@@ -384,8 +385,6 @@ if df is not None:
                 color: #F8FAFC !important;
                 background-color: #1E293B !important;
             }}
-
-            /* Hiệu ứng chớp nháy điểm đứt cáp */
             .custom-break-icon {{
                 background-color: #FF2A6D;
                 border: 2px solid #FFFFFF;
@@ -402,8 +401,6 @@ if df is not None:
                 70% {{ transform: scale(1.3); box-shadow: 0 0 0 15px rgba(255, 42, 109, 0); }}
                 100% {{ transform: scale(0.9); box-shadow: 0 0 0 0 rgba(255, 42, 109, 0); }}
             }}
-
-            /* Vị trí GPS Người dùng */
             .user-location-marker {{
                 background-color: #3B82F6;
                 border: 3px solid #FFFFFF;
@@ -414,7 +411,6 @@ if df is not None:
                 margin-top: -9px !important;
                 box-shadow: 0 0 10px rgba(59, 130, 246, 0.9);
             }}
-
             .leaflet-control-locate {{
                 background-color: #1E293B;
                 border: 1px solid #334155;
@@ -429,12 +425,9 @@ if df is not None:
         <div id="map"></div>
         <script>
             document.addEventListener("DOMContentLoaded", function() {{
-                // Lớp Nền Dark Theme CartoDB
                 var darkCarto = L.tileLayer('https://{{s}}.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
                     maxZoom: 20, attribution: 'CartoDB Dark'
                 }});
-
-                // Lớp Nền Google Đường Phố & Vệ Tinh
                 var googleStreets = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}', {{
                     maxZoom: 20, attribution: 'Google Maps'
                 }});
@@ -446,7 +439,7 @@ if df is not None:
                     zoomControl: true,
                     attributionControl: false,
                     layers: [darkCarto]
-                }}).setView({json.dumps(map_center)}, {zoom_lvl});
+                }}).setView({map_center_json}, {zoom_lvl});
 
                 var baseMaps = {{
                     "🌙 Dark Mode": darkCarto,
@@ -455,8 +448,7 @@ if df is not None:
                 }};
                 L.control.layers(baseMaps, null, {{ position: 'topright' }}).addTo(map);
 
-                // Vẽ Tuyến Cáp
-                var polylinesData = {json.dumps(polylines)};
+                var polylinesData = {polylines_json};
                 polylinesData.forEach(function(item) {{
                     var line = L.polyline(item.coords, {{
                         color: item.color, weight: item.weight, opacity: item.opacity
@@ -464,8 +456,7 @@ if df is not None:
                     if (item.tooltip) line.bindTooltip(item.tooltip);
                 }});
 
-                // Vẽ Điểm Kết Nối (Nodes)
-                var markersData = {json.dumps(markers)};
+                var markersData = {markers_json};
                 markersData.forEach(function(item) {{
                     var circle = L.circleMarker(item.coords, {{
                         radius: item.radius, color: item.color, fillColor: '#0F172A', fillOpacity: 0.9, weight: 2
@@ -474,8 +465,7 @@ if df is not None:
                     if (item.tooltip) circle.bindTooltip(item.tooltip);
                 }});
 
-                // Vẽ Điểm Đứt Cáp
-                var breakMarkerData = {json.dumps(break_marker)};
+                var breakMarkerData = {break_marker_json};
                 if (breakMarkerData) {{
                     var breakIcon = L.divIcon({{ className: 'custom-break-icon' }});
                     var bMarker = L.marker(breakMarkerData.coords, {{ icon: breakIcon }}).addTo(map);
@@ -483,9 +473,6 @@ if df is not None:
                     if (breakMarkerData.tooltip) bMarker.bindTooltip(breakMarkerData.tooltip);
                 }}
 
-                // -------------------------------------------------------------
-                // ĐỊNH VỊ GPS SIÊU NHANH BẰNG BROWSER GEOLOCATION API DIRECT
-                // -------------------------------------------------------------
                 var userMarker = null;
                 var accuracyCircle = null;
 
@@ -512,7 +499,6 @@ if df is not None:
                     console.warn("GPS Warning/Error: " + err.message);
                 }}
 
-                // Kích hoạt định vị siêu tốc với cấu hình độ chính xác cao và không dùng cache
                 if ("geolocation" in navigator) {{
                     navigator.geolocation.watchPosition(updateLocation, handleGPSError, {{
                         enableHighAccuracy: true,
@@ -521,7 +507,6 @@ if df is not None:
                     }});
                 }}
 
-                // Nút Bấm Định Vị Nhanh
                 var locateControl = L.Control.extend({{
                     options: {{ position: 'topleft' }},
                     onAdd: function (map) {{
@@ -535,7 +520,7 @@ if df is not None:
                                     map.flyTo(latlng, 18);
                                     updateLocation(pos);
                                 }}, handleGPSError, {{ enableHighAccuracy: true, timeout: 3000 }});
-                            }
+                            }}
                         }};
                         return container;
                     }}
