@@ -190,7 +190,7 @@ with st.sidebar:
     # 1. Chọn điểm
     options = df['Tên đối tượng'].tolist()
     selected_names = st.multiselect(
-        "🎯 Danh sách tập điểm target:",
+        "🎯 Chọn danh sách tập điểm cần đi :",
         options=options,
         help="Chọn các mục tiêu cần quét lộ trình"
     )
