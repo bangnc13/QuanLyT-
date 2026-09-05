@@ -134,6 +134,44 @@ st.markdown("""
     li[role="option"]:hover {
         background-color: rgba(0, 240, 255, 0.2) !important;
     }
+
+    /* ================= BO TRÒN VÀ TẠO HIỆU ỨNG NEON XANH CHO NÚT COLLAPSE/EXPAND SIDEBAR ================= */
+    [data-testid="stSidebarCollapseButton"] button,
+    [data-testid="stSidebarExpandButton"] button {
+        background-color: #1f0c00 !important;
+        border: 2px solid #00f0ff !important;
+        border-radius: 50% !important;
+        color: #00f0ff !important;
+        box-shadow: 0 0 10px rgba(0, 240, 255, 0.6), inset 0 0 5px rgba(0, 240, 255, 0.4) !important;
+        transition: all 0.3s ease-in-out !important;
+        width: 40px !important;
+        height: 40px !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* Đổi màu icon svg bên trong nút */
+    [data-testid="stSidebarCollapseButton"] button svg,
+    [data-testid="stSidebarExpandButton"] button svg {
+        fill: #00f0ff !important;
+        color: #00f0ff !important;
+    }
+
+    /* Hiệu ứng Hover Rực Sáng Neon */
+    [data-testid="stSidebarCollapseButton"] button:hover,
+    [data-testid="stSidebarExpandButton"] button:hover {
+        background-color: #00f0ff !important;
+        box-shadow: 0 0 20px #00f0ff, 0 0 35px #00f0ff !important;
+        transform: scale(1.1) !important;
+    }
+
+    [data-testid="stSidebarCollapseButton"] button:hover svg,
+    [data-testid="stSidebarExpandButton"] button:hover svg {
+        fill: #000000 !important;
+        color: #000000 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
