@@ -102,21 +102,19 @@ else:
     if waypoints:
         gmaps_full_route_url += f"&waypoints={urllib.parse.quote(waypoints)}"
 
-    # 6. Khởi tạo Bản đồ Google Maps (Ẩn nút zoom mặc định để đưa xuống góc dưới)
+    # 6. Khởi tạo Bản đồ Google Maps (Tắt nút zoom mặc định ở góc trên trái)
     center_lat = ordered_df['Latitude'].mean()
     center_lon = ordered_df['Longitude'].mean()
 
     m = folium.Map(
         location=[center_lat, center_lon], 
         zoom_start=13,
-        zoom_control=False,  # Tắt nút zoom mặc định góc trên trái
+        zoom_control=False,
         tiles="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
         attr="Google Maps Hybrid"
     )
 
-    # Đặt nút Zoom (+ -) xuống góc dưới bên phải (bottomright)
-    folium.plugins.FloatImage
-    m.add_child(folium.plugins.GroupedLayerControl()) if False else None
+    # Đưa nút Zoom (+ -) xuống góc dưới bên phải
     m.get_root().html.add_child(folium.Element('''
         <script>
             L.control.zoom({ position: 'bottomright' }).addTo(map);
@@ -133,7 +131,7 @@ else:
         icon_element='<span class="fa fa-crosshairs" style="color: #00ffcc; font-size: 18px;"></span>'
     ).add_to(m)
 
-    # 7. Bảng điều khiển HUD trên màn hình Bản đồ
+    # 7. Bảng điều khiển HUD thông số lộ trình
     hud_html = f'''
     <div style="
         position: fixed; 
@@ -171,7 +169,7 @@ else:
     '''
     m.get_root().html.add_child(folium.Element(hud_html))
 
-    # 8. Tích hợp Công cụ Chỉ đường Thông minh trực tiếp trên Map (Leaflet Routing Machine / OSRM)
+    # 8. Công cụ Chỉ đường Thông minh trực tiếp trên Map
     node_options_js = "".join([f'<option value="{row["Latitude"]},{row["Longitude"]}">#{idx+1}. {row["Tên đối tượng"]}</option>' for idx, row in ordered_df.iterrows()])
     
     routing_hud_html = f'''
@@ -253,7 +251,7 @@ else:
     '''
     m.get_root().html.add_child(folium.Element(routing_hud_html))
 
-    # 9. Vẽ đường chim bay tổng thể giữa các mốc
+    # 9. Đường nối lộ trình
     route_coords = ordered_df[['Latitude', 'Longitude']].values.tolist()
     folium.PolyLine(
         route_coords, 
@@ -263,7 +261,7 @@ else:
         dash_array='6, 6'
     ).add_to(m)
 
-    # 10. Marker điểm mốc Robotic HUD
+    # 10. Marker điểm mốc
     for idx, row in ordered_df.iterrows():
         seq_num = idx + 1
         direct_gmaps_url = f"https://www.google.com/maps/dir/?api=1&destination={row['Latitude']},{row['Longitude']}"
