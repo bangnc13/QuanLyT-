@@ -38,30 +38,6 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    /* ========================================================= */
-    /* ĐỔI MÀU CHỮ TRONG Ô MULTISELECT SANG MÀU XANH DƯƠNG       */
-    /* ========================================================= */
-    
-    /* 1. Chữ của các thẻ (tags) đã được chọn trong ô multiselect */
-    [data-baseweb="tag"] span {
-        color: #007bff !important; /* Blue */
-        font-weight: bold !important;
-    }
-
-    /* 2. Chữ hiển thị khi bấm mở danh sách thả xuống (Dropdown menu) */
-    [data-baseweb="menu"] span, 
-    [data-baseweb="menu"] div,
-    li[role="option"] {
-        color: #007bff !important; /* Blue */
-    }
-
-    /* 3. Chữ placeholder (khi chưa chọn gì) hoặc input nhập liệu trong ô multiselect */
-    [data-baseweb="select"] input,
-    [data-baseweb="select"] input::placeholder {
-        color: #007bff !important; /* Blue */
-    }
-    /* ========================================================= */
-
     /* Tối ưu nền Sidebar dạng Dark Orange Robotic Gradient */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #331400 0%, #1f0c00 100%) !important;
