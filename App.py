@@ -97,7 +97,7 @@ if 'route_summary' not in st.session_state:
 
 # ================= TẠO BẢNG ĐIỀU KHIỂN (SIDEBAR) =================
 with st.sidebar:
-    st.header("📋 Bảng điều khiển")
+    st.header("📋 Make by BangNC13")
     
     # 1. Danh sách chọn tập điểm
     options = df['Tên đối tượng'].tolist()
