@@ -5,3 +5,5 @@ folium
 streamlit-folium
 streamlit-js-eval
 openpyxl
+networkx
+openpyxl
