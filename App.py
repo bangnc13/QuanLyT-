@@ -4,42 +4,48 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-# 1. Cấu hình trang Streamlit
+# ==========================================
+# 1. CẤU HÌNH TRANG STREAMLIT
+# ==========================================
 st.set_page_config(
     page_title="Tối Ưu Lộ Trình Di Chuyển Tập Điểm",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Trong Suốt & Nút bấm Toggle xanh Neon
+# ==========================================
+# 2. CSS & JAVASCRIPT TÙY CHỈNH GIAO DIỆN
+# ==========================================
 st.markdown(
     """
     <style>
-        /* 1. Thiết lập tràn màn hình tuyệt đối */
+        /* 1. Thiết lập tràn màn hình tuyệt đối và linh hoạt cuộn */
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
             margin: 0 !important;
             padding: 0 !important;
-            height: 100vh !important;
-            overflow: hidden !important;
+            height: 100% !important;
             background-color: transparent !important;
         }
 
-        /* 2. LÀM TRONG SUỐT VÀ MỜ KÍNH CHO SIDEBAR (MENU) */
+        /* 2. CHO PHÉP CUỘN SIDEBAR KHI MỞ BÀN PHÍM VÀ LÀM MỜ KÍNH */
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
             background-color: rgba(255, 255, 255, 0.4) !important; /* Độ trong suốt 40% */
-            backdrop-filter: blur(12px) !important; /* Hiệu ứng làm mờ kính */
+            backdrop-filter: blur(12px) !important;
             -webkit-backdrop-filter: blur(12px) !important;
             border-right: 1px solid rgba(255, 255, 255, 0.3) !important;
             box-shadow: 4px 0 15px rgba(0, 0, 0, 0.05) !important;
+            overflow-y: auto !important; /* Cho phép cuộn trên mobile */
+            -webkit-overflow-scrolling: touch !important;
         }
 
-        /* Điều chỉnh container bên trong Sidebar */
+        /* Container bên trong Sidebar có khoảng trống lớn bên dưới cho bàn phím ảo */
         section[data-testid="stSidebar"] > div:first-child {
             background: transparent !important;
             padding-top: 1rem !important;
             padding-left: 1rem !important;
             padding-right: 1rem !important;
+            padding-bottom: 12rem !important; /* Tạo khoảng trống cuộn lớn khi bật bàn phím */
         }
 
         /* 3. LÀM NỀN LOGO TRONG SUỐT HOÀN TOÀN */
@@ -60,7 +66,15 @@ st.markdown(
             object-fit: contain !important;
         }
 
-        /* 4. BO TRÒN VÀ MÀU XANH NEON CHO NÚT MỞ/ẨN SIDEBAR CỦA STREAMLIT */
+        /* 4. TỐI ƯU DANH SÁCH XỔ RA (SELECTBOX / MULTISELECT) ĐƯỢC NỔI LÊN TRÊN CÙNG */
+        div[data-baseweb="popover"], 
+        div[data-baseweb="menu"],
+        [data-testid="stSelectbox"] div,
+        [data-testid="stMultiSelect"] div {
+            z-index: 9999999 !important;
+        }
+
+        /* 5. NÚT MỞ/ẨN SIDEBAR - NỔI BẬT VỚI MÀU XANH NEON */
         [data-testid="stSidebarCollapseButton"], 
         [data-testid="stSidebarNavItems"] button,
         button[aria-label="Close sidebar"],
@@ -117,12 +131,32 @@ st.markdown(
             display: block !important;
         }
     </style>
+
+    <!-- JS TỰ ĐỘNG CUỘN KHUNG NHẬP KHI BẤM CHỌN THÀNH PHẦN -->
+    <script>
+        document.addEventListener('focusin', function(e) {
+            if (e.target.closest('[data-testid="stSidebar"]')) {
+                setTimeout(function() {
+                    e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+            }
+        });
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('[data-baseweb="select"]') || e.target.closest('[data-testid="stMultiSelect"]')) {
+                setTimeout(function() {
+                    e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+            }
+        });
+    </script>
 """,
     unsafe_allow_html=True,
 )
 
 
-# 2. Đọc file Excel dữ liệu điểm
+# ==========================================
+# 3. ĐỌC VÀ XỬ LÝ DỮ LIỆU EXCEL
+# ==========================================
 @st.cache_data
 def load_excel_data():
     possible_files = [
@@ -155,31 +189,32 @@ def load_excel_data():
 
 df, file_name = load_excel_data()
 
-# -------------------------------------------------------------
-# LOGO VÀO TRÊN CÙNG SIDEBAR CÓ NỀN TRONG SUỐT
-# -------------------------------------------------------------
+# ==========================================
+# 4. THANH MENU SIDEBAR
+# ==========================================
+# Hiển thị Logo với nền hoàn toàn trong suốt
 if os.path.exists("FPT_Telecom_logo.png"):
     st.sidebar.image("FPT_Telecom_logo.png", use_container_width=True)
 else:
     st.sidebar.caption("📷 *[FPT Telecom Logo]*")
 
 st.sidebar.markdown(
-    '<div class="sidebar-title"></div>', unsafe_allow_html=True
+    '<div class="sidebar-title">Tối Ưu Lộ Trình</div>', unsafe_allow_html=True
 )
 st.sidebar.markdown(
-    '<div class="sidebar-subtitle"> Make by'
-    " BangNC13 </div>",
+    '<div class="sidebar-subtitle">Tối ưu quãng đường thu cước - Make by'
+    " BangNC13</div>",
     unsafe_allow_html=True,
 )
 
-# Khởi tạo session state kích hoạt tối ưu từ sidebar
+# Khởi tạo session state để xử lý sự kiện
 if "trigger_optimize" not in st.session_state:
     st.session_state.trigger_optimize = False
 
 if df is not None:
     df.columns = [str(col).strip() for col in df.columns]
 
-    # Tìm tự động các cột Tên điểm, Vĩ độ (Lat), Kinh độ (Lng)
+    # Tìm các cột dữ liệu chính tự động
     name_col = next(
         (
             c
@@ -280,7 +315,7 @@ if df is not None:
 
     st.sidebar.info(f"Đã chọn **{len(selected_data)}** tập điểm.")
 
-    # 🔘 NÚT TỐI ƯU LỘ TRÌNH TRÊN SIDEBAR
+    # Nút bấm kích hoạt tối ưu lộ trình
     if st.sidebar.button(
         "🚀 Tối ưu lộ trình di chuyển", type="primary", use_container_width=True
     ):
@@ -290,7 +325,9 @@ if df is not None:
     if len(selected_data) > 0:
         map_center = [selected_data[0]["lat"], selected_data[0]["lng"]]
 
-    # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình
+    # ==========================================
+    # 5. GIAO DIỆN BẢN ĐỒ BẰNG LEAFLET JS
+    # ==========================================
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -445,7 +482,7 @@ if df is not None:
                 }}
                 renderInitialMarkers();
 
-                // Định vị GPS
+                // Quản lý định vị GPS Realtime
                 var userLatLng = null;
                 var userMarker = null;
                 var accuracyCircle = null;
@@ -494,6 +531,7 @@ if df is not None:
                     return R * c;
                 }}
 
+                // Thuật toán tìm đường đi tối ưu theo điểm gần nhất (TSP Nearest Neighbor)
                 function solveTSP(startPt, pts) {{
                     var unvisited = pts.slice();
                     var route = [startPt];
@@ -585,6 +623,7 @@ if df is not None:
                     }}).addTo(map);
                 }}
 
+                // Bổ sung các nút chức năng nhanh trên bản đồ
                 var CustomControls = L.Control.extend({{
                     options: {{ position: 'topleft' }},
                     onAdd: function (map) {{
