@@ -316,7 +316,7 @@ if df is not None:
     if len(selected_data) > 0:
         map_center = [selected_data[0]["lat"], selected_data[0]["lng"]]
 
-    # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình
+    # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình + Nút chuyển Google Maps
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -393,6 +393,7 @@ if df is not None:
             .custom-btn-container {{
                 display: flex !important;
                 flex-direction: row !important;
+                flex-wrap: wrap !important;
                 gap: 8px !important;
                 background: transparent !important;
                 border: none !important;
@@ -450,6 +451,18 @@ if df is not None:
             .btn-green-neon:hover {{
                 background-color: #009933 !important;
                 box-shadow: 0 0 15px #00CC44, 0 0 25px rgba(51, 255, 102, 1) !important;
+            }}
+
+            /* 4. NÚT GOOGLE MAPS: NỀN TÍM NEON */
+            .btn-purple-neon {{
+                background-color: #8B5CF6 !important;
+                color: #FFFFFF !important;
+                border: 2px solid #A78BFA !important;
+                box-shadow: 0 0 10px #8B5CF6, 0 0 18px rgba(167, 139, 250, 0.8) !important;
+            }}
+            .btn-purple-neon:hover {{
+                background-color: #7C3AED !important;
+                box-shadow: 0 0 15px #8B5CF6, 0 0 25px rgba(167, 139, 250, 1) !important;
             }}
 
             .leaflet-routing-container {{
@@ -575,12 +588,12 @@ if df is not None:
                         if (!isAuto) {{
                             alert("Đang bắt tín hiệu GPS... Vui lòng bật quyền vị trí trên trình duyệt và thử lại.");
                         }}
-                        return;
+                        return null;
                     }}
 
                     if (targets.length === 0) {{
                         alert("Vui lòng chọn ít nhất 1 tập điểm ở Sidebar.");
-                        return;
+                        return null;
                     }}
 
                     var startPoint = {{ name: "Điểm Xuất Phát (GPS)", lat: userLatLng.lat, lng: userLatLng.lng }};
@@ -631,6 +644,47 @@ if df is not None:
                             styles: [{{ color: '#FF6600', opacity: 0.85, weight: 6 }}]
                         }}
                     }}).addTo(map);
+
+                    return optimizedRoute;
+                }}
+
+                // Hàm mở đường đi qua App Google Maps
+                function openGoogleMapsApp() {{
+                    if (!userLatLng) {{
+                        alert("Chưa xác định được vị trí GPS hiện tại của bạn!");
+                        return;
+                    }}
+                    if (targets.length === 0) {{
+                        alert("Vui lòng chọn ít nhất 1 tập điểm ở Sidebar.");
+                        return;
+                    }}
+
+                    var startPoint = {{ name: "GPS", lat: userLatLng.lat, lng: userLatLng.lng }};
+                    var route = solveTSP(startPoint, targets);
+
+                    // Khởi tạo tham số đường đi cho URL Google Maps
+                    // Điểm xuất phát = GPS
+                    var origin = userLatLng.lat + "," + userLatLng.lng;
+                    
+                    // Điểm đích cuối cùng (quay về vị trí xuất phát GPS)
+                    var destination = route[route.length - 1].lat + "," + route[route.length - 1].lng;
+
+                    // Các điểm trung gian
+                    var waypointsArr = [];
+                    for (var i = 1; i < route.length - 1; i++) {{
+                        waypointsArr.push(route[i].lat + "," + route[i].lng);
+                    }}
+
+                    var waypointsStr = waypointsArr.join("|");
+
+                    // Tạo URL mở ứng dụng Google Maps đa điểm (multistop route)
+                    var gmapsUrl = "https://www.google.com/maps/dir/?api=1" +
+                        "&origin=" + encodeURIComponent(origin) +
+                        "&destination=" + encodeURIComponent(destination) +
+                        "&waypoints=" + encodeURIComponent(waypointsStr) +
+                        "&travelmode=driving";
+
+                    window.open(gmapsUrl, '_blank');
                 }}
 
                 var CustomControls = L.Control.extend({{
@@ -652,6 +706,12 @@ if df is not None:
                         btnRoute.innerHTML = '🚀 Tối ưu lộ trình';
                         btnRoute.onclick = function() {{
                             optimizeAndRoute(false);
+                        }};
+
+                        var btnGmaps = L.DomUtil.create('div', 'leaflet-control-btn btn-purple-neon', container);
+                        btnGmaps.innerHTML = '🗺️ Mở Google Maps';
+                        btnGmaps.onclick = function() {{
+                            openGoogleMapsApp();
                         }};
 
                         var btnToggleSidebar = L.DomUtil.create('div', 'leaflet-control-btn btn-green-neon', container);
