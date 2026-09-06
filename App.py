@@ -40,11 +40,18 @@ st.markdown("""
     header[data-testid="stHeader"] {
         background-color: transparent !important;
         background: transparent !important;
+        z-index: 1 !important;
     }
 
     header[data-testid="stHeader"] * {
         color: #ffffff !important;
         fill: #ffffff !important;
+    }
+
+    /* ẨN FOOTER STREAMLIT */
+    footer {
+        visibility: hidden !important;
+        height: 0px !important;
     }
 
     iframe {
@@ -458,17 +465,17 @@ if st.session_state.route_coords:
         tooltip="Cyber Round-Trip Route"
     ).add_to(m)
 
-# ================= ĐẬP NÚT FLOATING ACTION BUTTON GPS TRỰC TIẾP LÊN MAP =================
+# ================= FLOATING ACTION BUTTON GPS TRỰC TIẾP LÊN MAP =================
 gps_button_element = folium.Element("""
 <style>
     .leaflet-gps-fab {
-        position: absolute;
-        bottom: 30px;
-        right: 20px;
-        z-index: 9999;
+        position: fixed !important;
+        bottom: 60px !important;
+        right: 25px !important;
+        z-index: 999999 !important;
         width: 52px;
         height: 52px;
-        background: rgba(31, 12, 0, 0.9);
+        background: rgba(31, 12, 0, 0.95);
         border: 2px solid #00f0ff;
         border-radius: 50%;
         color: #00f0ff;
@@ -476,21 +483,18 @@ gps_button_element = folium.Element("""
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        box-shadow: 0 0 15px rgba(0, 240, 255, 0.5), inset 0 0 10px rgba(0, 240, 255, 0.2);
-        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        box-shadow: 0 0 15px rgba(0, 240, 255, 0.7), inset 0 0 10px rgba(0, 240, 255, 0.3);
+        transition: all 0.3s ease;
     }
     .leaflet-gps-fab:hover {
         transform: scale(1.15) rotate(90deg);
         background: #00f0ff;
         color: #000000;
-        box-shadow: 0 0 25px #00f0ff, 0 0 40px #00f0ff;
-    }
-    .leaflet-gps-fab:active {
-        transform: scale(0.95);
+        box-shadow: 0 0 25px #00f0ff;
     }
 </style>
 
-<div class="leaflet-gps-fab" id="map-gps-btn" title="Cập nhật vị trí GPS hiện tại">
+<div class="leaflet-gps-fab" id="map-gps-btn" title="Cập nhật vị trí GPS">
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"></circle>
         <path d="M12 2v3m0 14v3M2 12h3m14 0h3"></path>
@@ -498,35 +502,33 @@ gps_button_element = folium.Element("""
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    (function initGpsBtn() {
         var gpsBtn = document.getElementById('map-gps-btn');
         if (gpsBtn) {
-            gpsBtn.addEventListener('click', function(e) {
+            gpsBtn.onclick = function(e) {
                 e.stopPropagation();
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                            const lat = position.coords.latitude;
-                            const lon = position.coords.longitude;
-                            
-                            // Gửi tọa độ lên cửa sổ mẹ Streamlit
+                        function(position) {
                             window.parent.postMessage({
                                 type: 'UPDATE_GPS_LOCATION',
-                                lat: lat,
-                                lon: lon
+                                lat: position.coords.latitude,
+                                lon: position.coords.longitude
                             }, '*');
                         },
-                        (error) => {
-                            alert("Lỗi truy cập GPS! Vui lòng bật định vị trên thiết bị.");
+                        function(error) {
+                            alert("Vui lòng bật quyền truy cập GPS trên thiết bị/trình duyệt!");
                         },
                         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                     );
                 } else {
                     alert("Trình duyệt không hỗ trợ Geolocation.");
                 }
-            });
+            };
+        } else {
+            setTimeout(initGpsBtn, 100);
         }
-    });
+    })();
 </script>
 """)
 m.get_root().html.add_child(gps_button_element)
