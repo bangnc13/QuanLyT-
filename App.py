@@ -193,9 +193,8 @@ st.markdown("""
         color: #000000 !important;
     }
 
-    /* ẨN NÚT ZOOM (+/-) VÀ MENU LAYER CONTROL BẢN ĐỒ */
-    .leaflet-control-zoom,
-    .leaflet-control-layers {
+    /* ẨN NÚT ZOOM (+/-) */
+    .leaflet-control-zoom {
         display: none !important;
     }
 </style>
@@ -439,19 +438,28 @@ m = folium.Map(
     zoom_control=False
 )
 
+# LAYER 1: Google Street - Đặt mặc định hiển thị
 folium.TileLayer(
     tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
     attr='Google Maps',
-    name='Google Street',
-    overlay=False
+    name='Google Street (Đường phố)',
+    overlay=False,
+    control=True,
+    show=True
 ).add_to(m)
 
+# LAYER 2: Google Satellite - Chế độ Vệ tinh phụ
 folium.TileLayer(
     tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
     attr='Google Satellite',
-    name='Google Satellite',
-    overlay=False
+    name='Google Satellite (Vệ tinh)',
+    overlay=False,
+    control=True,
+    show=False
 ).add_to(m)
+
+# Thêm bộ chọn Layer Control ở góc trên bên phải bản đồ
+folium.LayerControl(position='topright').add_to(m)
 
 # Hiển thị Mũi Tên Định Hướng GPS Realtime
 if st.session_state.current_loc:
