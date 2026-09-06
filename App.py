@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Trong Suốt & Nút bấm Toggle xanh Neon
+# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Trong Suốt & Nút bấm Blink Neon
 st.markdown(
     """
     <style>
@@ -124,6 +124,32 @@ st.markdown(
             font-weight: 500 !important;
         }
 
+        /* 5. TẠO HIỆU ỨNG BLINK (NHẤP NHÁY) CHO NÚT TỐI ƯU LỘ TRÌNH BÊN SIDEBAR */
+        @keyframes neon-blink {
+            0%, 100% {
+                background-color: #FF6600 !important;
+                box-shadow: 0 0 12px #FF6600, 0 0 24px rgba(255, 102, 0, 0.8) !important;
+                border-color: #FF9933 !important;
+                transform: scale(1);
+            }
+            50% {
+                background-color: #FF3300 !important;
+                box-shadow: 0 0 22px #FF3300, 0 0 40px rgba(255, 51, 0, 1) !important;
+                border-color: #FFCC00 !important;
+                transform: scale(1.02);
+            }
+        }
+
+        .blink-btn button {
+            animation: neon-blink 1.5s infinite ease-in-out !important;
+            color: #FFFFFF !important;
+            font-weight: bold !important;
+            border-radius: 20px !important;
+            border: 2px solid #FF9933 !important;
+            transition: all 0.3s ease !important;
+            margin-bottom: 15px !important;
+        }
+
         .main .block-container, 
         [data-testid="stMainBlockContainer"],
         [data-testid="stVerticalBlock"],
@@ -201,6 +227,14 @@ st.sidebar.markdown(
 # Khởi tạo session state kích hoạt tối ưu từ sidebar
 if "trigger_optimize" not in st.session_state:
     st.session_state.trigger_optimize = False
+
+# 🔘 NÚT TỐI ƯU LỘ TRÌNH ĐẶT NGAY DƯỚI "Make by BangNC13" VỚI HIỆU ỨNG BLINK
+st.sidebar.markdown('<div class="blink-btn">', unsafe_allow_html=True)
+if st.sidebar.button(
+    "🚀 Tối ưu lộ trình di chuyển", type="primary", use_container_width=True
+):
+    st.session_state.trigger_optimize = True
+st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
 if df is not None:
     df.columns = [str(col).strip() for col in df.columns]
@@ -305,12 +339,6 @@ if df is not None:
         })
 
     st.sidebar.info(f"Đã chọn **{len(selected_data)}** tập điểm.")
-
-    # 🔘 NÚT TỐI ƯU LỘ TRÌNH TRÊN SIDEBAR
-    if st.sidebar.button(
-        "🚀 Tối ưu lộ trình di chuyển", type="primary", use_container_width=True
-    ):
-        st.session_state.trigger_optimize = True
 
     map_center = [21.0285, 105.8542]
     if len(selected_data) > 0:
@@ -662,14 +690,9 @@ if df is not None:
                     var startPoint = {{ name: "GPS", lat: userLatLng.lat, lng: userLatLng.lng }};
                     var route = solveTSP(startPoint, targets);
 
-                    // Khởi tạo tham số đường đi cho URL Google Maps
-                    // Điểm xuất phát = GPS
                     var origin = userLatLng.lat + "," + userLatLng.lng;
-                    
-                    // Điểm đích cuối cùng (quay về vị trí xuất phát GPS)
                     var destination = route[route.length - 1].lat + "," + route[route.length - 1].lng;
 
-                    // Các điểm trung gian
                     var waypointsArr = [];
                     for (var i = 1; i < route.length - 1; i++) {{
                         waypointsArr.push(route[i].lat + "," + route[i].lng);
@@ -677,7 +700,6 @@ if df is not None:
 
                     var waypointsStr = waypointsArr.join("|");
 
-                    // Tạo URL mở ứng dụng Google Maps đa điểm (multistop route)
                     var gmapsUrl = "https://www.google.com/maps/dir/?api=1" +
                         "&origin=" + encodeURIComponent(origin) +
                         "&destination=" + encodeURIComponent(destination) +
