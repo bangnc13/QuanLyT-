@@ -6,12 +6,12 @@ import streamlit.components.v1 as components
 
 # 1. Cấu hình trang Streamlit
 st.set_page_config(
-    page_title="Map make by BangNC13",
+    page_title="Tối Ưu Lộ Trình Di Chuyển Tập Điểm",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Trong Suốt & Nút bấm Neon Glow Pulse + Flash Nhấp Nháy
+# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Trong Suốt & Nút bấm Toggle xanh Neon
 st.markdown(
     """
     <style>
@@ -57,7 +57,7 @@ st.markdown(
             background-color: transparent !important;
         }
 
-        /* 2. LÀM TRONG SUỐT VÀ MỜ KÍNH CHO SIDEBAR (MENU BÊN TRÁI) */
+        /* 2. LÀM TRONG SUỐT VÀ MỜ KÍNH CHO SIDEBAR (MENU) */
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
             background-color: rgba(255, 255, 255, 0.4) !important;
@@ -124,59 +124,6 @@ st.markdown(
             font-weight: 500 !important;
         }
 
-        /* ========================================================= */
-        /* 5. HIỆU ỨNG NHẤP NHÁY & TỎA SÁNG NEON DÀNH CHO NÚT SIDEBAR */
-        /* ========================================================= */
-        @keyframes neon-flash-pulse {
-            0%, 100% {
-                background-color: #FF6600 !important;
-                border-color: #FF9933 !important;
-                box-shadow: 0 0 8px #FF6600, 
-                            0 0 18px #FF6600, 
-                            0 0 30px rgba(255, 102, 0, 0.85) !important;
-                opacity: 1;
-                transform: scale(1);
-            }
-            25% {
-                opacity: 0.3;
-            }
-            50% {
-                background-color: #FF1100 !important;
-                border-color: #FFEE00 !important;
-                box-shadow: 0 0 15px #FF1100, 
-                            0 0 30px #FF1100, 
-                            0 0 50px rgba(255, 17, 0, 1), 
-                            0 0 15px #FFEE00 !important;
-                opacity: 1;
-                transform: scale(1.04);
-            }
-            75% {
-                opacity: 0.4;
-            }
-        }
-
-        .blink-btn button {
-            animation: neon-flash-pulse 1.2s infinite ease-in-out !important;
-            color: #FFFFFF !important;
-            font-weight: 800 !important;
-            font-size: 0.98rem !important;
-            border-radius: 25px !important;
-            border: 2px solid #FF9933 !important;
-            transition: all 0.2s ease !important;
-            margin-top: 5px !important;
-            margin-bottom: 15px !important;
-            text-shadow: 0 0 6px rgba(0, 0, 0, 0.7) !important;
-        }
-
-        .blink-btn button:hover {
-            animation: none !important;
-            background-color: #FF0000 !important;
-            border-color: #FFFFFF !important;
-            box-shadow: 0 0 20px #FF0000, 0 0 40px #FF0000, 0 0 60px #FF0000 !important;
-            transform: scale(1.06) !important;
-            opacity: 1 !important;
-        }
-
         .main .block-container, 
         [data-testid="stMainBlockContainer"],
         [data-testid="stVerticalBlock"],
@@ -235,7 +182,9 @@ def load_excel_data():
 
 df, file_name = load_excel_data()
 
-# Logo và Title Sidebar
+# -------------------------------------------------------------
+# LOGO VÀO TRÊN CÙNG SIDEBAR CÓ NỀN TRONG SUỐT
+# -------------------------------------------------------------
 if os.path.exists("FPT_Telecom_logo.png"):
     st.sidebar.image("FPT_Telecom_logo.png", use_container_width=True)
 else:
@@ -249,49 +198,27 @@ st.sidebar.markdown(
     unsafe_allow_html=True,
 )
 
+# Khởi tạo session state kích hoạt tối ưu từ sidebar
 if "trigger_optimize" not in st.session_state:
     st.session_state.trigger_optimize = False
-
-st.sidebar.markdown('<div class="blink-btn">', unsafe_allow_html=True)
-if st.sidebar.button(
-    "🚀 Tối ưu lộ trình di chuyển", type="primary", use_container_width=True
-):
-    st.session_state.trigger_optimize = True
-st.sidebar.markdown('</div>', unsafe_allow_html=True)
-
-# 3. Trích xuất dữ liệu điểm thông minh
-selected_data = []
 
 if df is not None:
     df.columns = [str(col).strip() for col in df.columns]
 
-    # Tìm cột Tên điểm
+    # Tìm tự động các cột Tên điểm, Vĩ độ (Lat), Kinh độ (Lng)
     name_col = next(
         (
             c
             for c in df.columns
-            if any(
-                k in c.lower()
-                for k in [
-                    "tên",
-                    "điểm",
-                    "kn",
-                    "station",
-                    "name",
-                    "tập điểm",
-                    "mã",
-                ]
-            )
+            if any(k in c.lower() for k in ["tên", "điểm", "kn", "station", "name"])
         ),
         df.columns[0],
     )
-
-    # Tìm cột Vĩ độ (Lat) và Kinh độ (Lng)
     lat_col = next(
         (
             c
             for c in df.columns
-            if any(k in c.lower() for k in ["lat", "vĩ độ", "vi do", "y"])
+            if any(k in c.lower() for k in ["lat", "vĩ độ", "vi do"])
         ),
         None,
     )
@@ -299,28 +226,21 @@ if df is not None:
         (
             c
             for c in df.columns
-            if any(
-                k in c.lower()
-                for k in ["lng", "lon", "kinh độ", "kinh do", "x"]
-            )
+            if any(k in c.lower() for k in ["lng", "lon", "kinh độ", "kinh do"])
         ),
         None,
     )
 
     points_dict = {}
-
     if lat_col and lon_col:
-        for idx, row in df.iterrows():
-            p_name = (
-                str(row[name_col]).strip()
-                if pd.notnull(row[name_col])
-                else f"Điểm {idx+1}"
-            )
+        for _, row in df.iterrows():
+            p_name = str(row[name_col]).strip()
             try:
                 if pd.notnull(row[lat_col]) and pd.notnull(row[lon_col]):
-                    lat_val = float(str(row[lat_col]).replace(",", "."))
-                    lon_val = float(str(row[lon_col]).replace(",", "."))
-                    points_dict[p_name] = {"lat": lat_val, "lng": lon_val}
+                    points_dict[p_name] = {
+                        "lat": float(row[lat_col]),
+                        "lng": float(row[lon_col]),
+                    }
             except Exception:
                 pass
     else:
@@ -328,7 +248,7 @@ if df is not None:
             (
                 c
                 for c in df.columns
-                if "lat" in c.lower() or "vĩ" in c.lower()
+                if "lat" in c.lower() and "1" in c.lower()
             ),
             None,
         )
@@ -336,25 +256,24 @@ if df is not None:
             (
                 c
                 for c in df.columns
-                if "lng" in c.lower()
-                or "lon" in c.lower()
-                or "kinh" in c.lower()
+                if ("lng" in c.lower() or "lon" in c.lower()) and "1" in c.lower()
             ),
             None,
         )
+        k1_col = next(
+            (c for c in df.columns if "kn1" in c.lower() or "điểm 1" in c.lower()),
+            name_col,
+        )
 
         if lat_col1 and lon_col1:
-            for idx, row in df.iterrows():
-                p_name = (
-                    str(row[name_col]).strip()
-                    if pd.notnull(row[name_col])
-                    else f"Điểm {idx+1}"
-                )
+            for _, row in df.iterrows():
+                p_name = str(row[k1_col]).strip()
                 try:
                     if pd.notnull(row[lat_col1]) and pd.notnull(row[lon_col1]):
-                        lat_val = float(str(row[lat_col1]).replace(",", "."))
-                        lon_val = float(str(row[lon_col1]).replace(",", "."))
-                        points_dict[p_name] = {"lat": lat_val, "lng": lon_val}
+                        points_dict[p_name] = {
+                            "lat": float(row[lat_col1]),
+                            "lng": float(row[lon_col1]),
+                        }
                 except Exception:
                     pass
 
@@ -363,40 +282,41 @@ if df is not None:
     st.sidebar.markdown("---")
     st.sidebar.subheader("📍 CHỌN CÁC TẬP ĐIỂM CẦN ĐẾN")
 
-    if len(all_point_names) > 0:
-        selected_points = st.sidebar.multiselect(
-            "Chọn các điểm cần đi qua:",
-            options=all_point_names,
-            default=(
-                all_point_names[:5]
-                if len(all_point_names) >= 5
-                else all_point_names
-            ),
-            help=(
-                "Thứ tự tối ưu sẽ được tự động tính toán dựa theo vị trí GPS"
-                " của bạn."
-            ),
-        )
+    selected_points = st.sidebar.multiselect(
+        "Chọn các điểm cần đi qua:",
+        options=all_point_names,
+        default=(
+            all_point_names[:5]
+            if len(all_point_names) >= 5
+            else all_point_names
+        ),
+        help=(
+            "Thứ tự tối ưu sẽ được tự động tính toán dựa theo vị trí GPS xuất"
+            " phát của bạn."
+        ),
+    )
 
-        for p in selected_points:
-            selected_data.append({
-                "name": p,
-                "lat": points_dict[p]["lat"],
-                "lng": points_dict[p]["lng"],
-            })
+    selected_data = []
+    for p in selected_points:
+        selected_data.append({
+            "name": p,
+            "lat": points_dict[p]["lat"],
+            "lng": points_dict[p]["lng"],
+        })
 
-        st.sidebar.info(f"Đã chọn **{len(selected_data)}** tập điểm.")
-    else:
-        st.sidebar.error(
-            "⚠️ Không tìm thấy dữ liệu tọa độ hợp lệ trong file Excel!"
-        )
-        st.sidebar.write("📌 Tên các cột hiện có trong file:", list(df.columns))
+    st.sidebar.info(f"Đã chọn **{len(selected_data)}** tập điểm.")
+
+    # 🔘 NÚT TỐI ƯU LỘ TRÌNH TRÊN SIDEBAR
+    if st.sidebar.button(
+        "🚀 Tối ưu lộ trình di chuyển", type="primary", use_container_width=True
+    ):
+        st.session_state.trigger_optimize = True
 
     map_center = [21.0285, 105.8542]
     if len(selected_data) > 0:
         map_center = [selected_data[0]["lat"], selected_data[0]["lng"]]
 
-    # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình + Nút chuyển Google Maps
+    # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -426,6 +346,7 @@ if df is not None:
                 background: #e5e3df;
             }}
 
+            /* ẨN TOÀN BỘ CÁC BIỂU TƯỢNG VÀ NÚT Ở GÓC DƯỚI BÊN PHẢI BẢN ĐỒ */
             .leaflet-bottom.leaflet-right {{
                 display: none !important;
                 visibility: hidden !important;
@@ -472,7 +393,6 @@ if df is not None:
             .custom-btn-container {{
                 display: flex !important;
                 flex-direction: row !important;
-                flex-wrap: wrap !important;
                 gap: 8px !important;
                 background: transparent !important;
                 border: none !important;
@@ -496,6 +416,7 @@ if df is not None:
                 transform: translateY(-2px);
             }}
 
+            /* 1. NÚT GPS: NỀN XANH DƯƠNG - BO VIỀN NEON XANH DƯƠNG */
             .btn-blue-neon {{
                 background-color: #0066FF !important;
                 color: #FFFFFF !important;
@@ -507,6 +428,7 @@ if df is not None:
                 box-shadow: 0 0 15px #0066FF, 0 0 25px rgba(51, 153, 255, 1) !important;
             }}
 
+            /* 2. NÚT TỐI ƯU LỘ TRÌNH: NỀN CAM - BO VIỀN NEON CAM */
             .btn-orange-neon {{
                 background-color: #FF6600 !important;
                 color: #FFFFFF !important;
@@ -518,6 +440,7 @@ if df is not None:
                 box-shadow: 0 0 15px #FF6600, 0 0 25px rgba(255, 153, 51, 1) !important;
             }}
 
+            /* 3. NÚT MENU: NỀN XANH LÁ - BO VIỀN NEON XANH LÁ */
             .btn-green-neon {{
                 background-color: #00CC44 !important;
                 color: #FFFFFF !important;
@@ -527,17 +450,6 @@ if df is not None:
             .btn-green-neon:hover {{
                 background-color: #009933 !important;
                 box-shadow: 0 0 15px #00CC44, 0 0 25px rgba(51, 255, 102, 1) !important;
-            }}
-
-            .btn-purple-neon {{
-                background-color: #8B5CF6 !important;
-                color: #FFFFFF !important;
-                border: 2px solid #A78BFA !important;
-                box-shadow: 0 0 10px #8B5CF6, 0 0 18px rgba(167, 139, 250, 0.8) !important;
-            }}
-            .btn-purple-neon:hover {{
-                background-color: #7C3AED !important;
-                box-shadow: 0 0 15px #8B5CF6, 0 0 25px rgba(167, 139, 250, 1) !important;
             }}
 
             .leaflet-routing-container {{
@@ -663,12 +575,12 @@ if df is not None:
                         if (!isAuto) {{
                             alert("Đang bắt tín hiệu GPS... Vui lòng bật quyền vị trí trên trình duyệt và thử lại.");
                         }}
-                        return null;
+                        return;
                     }}
 
                     if (targets.length === 0) {{
                         alert("Vui lòng chọn ít nhất 1 tập điểm ở Sidebar.");
-                        return null;
+                        return;
                     }}
 
                     var startPoint = {{ name: "Điểm Xuất Phát (GPS)", lat: userLatLng.lat, lng: userLatLng.lng }};
@@ -719,40 +631,6 @@ if df is not None:
                             styles: [{{ color: '#FF6600', opacity: 0.85, weight: 6 }}]
                         }}
                     }}).addTo(map);
-
-                    return optimizedRoute;
-                }}
-
-                function openGoogleMapsApp() {{
-                    if (!userLatLng) {{
-                        alert("Chưa xác định được vị trí GPS hiện tại của bạn!");
-                        return;
-                    }}
-                    if (targets.length === 0) {{
-                        alert("Vui lòng chọn ít nhất 1 tập điểm ở Sidebar.");
-                        return;
-                    }}
-
-                    var startPoint = {{ name: "GPS", lat: userLatLng.lat, lng: userLatLng.lng }};
-                    var route = solveTSP(startPoint, targets);
-
-                    var origin = userLatLng.lat + "," + userLatLng.lng;
-                    var destination = route[route.length - 1].lat + "," + route[route.length - 1].lng;
-
-                    var waypointsArr = [];
-                    for (var i = 1; i < route.length - 1; i++) {{
-                        waypointsArr.push(route[i].lat + "," + route[i].lng);
-                    }}
-
-                    var waypointsStr = waypointsArr.join("|");
-
-                    var gmapsUrl = "https://www.google.com/maps/dir/?api=1" +
-                        "&origin=" + encodeURIComponent(origin) +
-                        "&destination=" + encodeURIComponent(destination) +
-                        "&waypoints=" + encodeURIComponent(waypointsStr) +
-                        "&travelmode=driving";
-
-                    window.open(gmapsUrl, '_blank');
                 }}
 
                 var CustomControls = L.Control.extend({{
@@ -774,12 +652,6 @@ if df is not None:
                         btnRoute.innerHTML = '🚀 Tối ưu lộ trình';
                         btnRoute.onclick = function() {{
                             optimizeAndRoute(false);
-                        }};
-
-                        var btnGmaps = L.DomUtil.create('div', 'leaflet-control-btn btn-purple-neon', container);
-                        btnGmaps.innerHTML = '🗺️ Mở Google Maps';
-                        btnGmaps.onclick = function() {{
-                            openGoogleMapsApp();
                         }};
 
                         var btnToggleSidebar = L.DomUtil.create('div', 'leaflet-control-btn btn-green-neon', container);
@@ -814,6 +686,7 @@ if df is not None:
     """
 
     components.html(leaflet_html, height=1000, scrolling=False)
+
     st.session_state.trigger_optimize = False
 
 else:
