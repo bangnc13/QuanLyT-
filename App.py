@@ -344,7 +344,7 @@ if df is not None:
     st.sidebar.subheader("📍 CHỌN CÁC TẬP ĐIỂM CẦN ĐẾN")
 
     selected_points = st.sidebar.multiselect(
-        "Chọn các điểm cần đi qua:",
+        "",
         options=all_point_names,
         default=(
             all_point_names[:5]
