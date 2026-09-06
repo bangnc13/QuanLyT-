@@ -316,7 +316,7 @@ if df is not None:
     if len(selected_data) > 0:
         map_center = [selected_data[0]["lat"], selected_data[0]["lng"]]
 
-    # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình
+    # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình + Google Maps
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -397,6 +397,7 @@ if df is not None:
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
+                flex-wrap: wrap !important;
             }}
 
             .leaflet-control-btn {{
@@ -416,7 +417,7 @@ if df is not None:
                 transform: translateY(-2px);
             }}
 
-            /* 1. NÚT GPS: NỀN XANH DƯƠNG - BO VIỀN NEON XANH DƯƠNG */
+            /* 1. NÚT GPS: NỀN XANH DƯƠNG */
             .btn-blue-neon {{
                 background-color: #0066FF !important;
                 color: #FFFFFF !important;
@@ -428,7 +429,7 @@ if df is not None:
                 box-shadow: 0 0 15px #0066FF, 0 0 25px rgba(51, 153, 255, 1) !important;
             }}
 
-            /* 2. NÚT TỐI ƯU LỘ TRÌNH: NỀN CAM - BO VIỀN NEON CAM */
+            /* 2. NÚT TỐI ƯU LỘ TRÌNH: NỀN CAM */
             .btn-orange-neon {{
                 background-color: #FF6600 !important;
                 color: #FFFFFF !important;
@@ -440,7 +441,19 @@ if df is not None:
                 box-shadow: 0 0 15px #FF6600, 0 0 25px rgba(255, 153, 51, 1) !important;
             }}
 
-            /* 3. NÚT MENU: NỀN XANH LÁ - BO VIỀN NEON XANH LÁ */
+            /* 3. NÚT GOOGLE MAPS: NỀN ĐỎ NEON */
+            .btn-gmaps-neon {{
+                background-color: #EA4335 !important;
+                color: #FFFFFF !important;
+                border: 2px solid #FF7769 !important;
+                box-shadow: 0 0 10px #EA4335, 0 0 18px rgba(234, 67, 53, 0.8) !important;
+            }}
+            .btn-gmaps-neon:hover {{
+                background-color: #C5221F !important;
+                box-shadow: 0 0 15px #EA4335, 0 0 25px rgba(234, 67, 53, 1) !important;
+            }}
+
+            /* 4. NÚT MENU: NỀN XANH LÁ */
             .btn-green-neon {{
                 background-color: #00CC44 !important;
                 color: #FFFFFF !important;
@@ -569,6 +582,7 @@ if df is not None:
                 }}
 
                 var routingControl = null;
+                var currentOptimizedRoute = null;
 
                 function optimizeAndRoute(isAuto) {{
                     if (!userLatLng) {{
@@ -584,18 +598,18 @@ if df is not None:
                     }}
 
                     var startPoint = {{ name: "Điểm Xuất Phát (GPS)", lat: userLatLng.lat, lng: userLatLng.lng }};
-                    var optimizedRoute = solveTSP(startPoint, targets);
+                    currentOptimizedRoute = solveTSP(startPoint, targets);
 
                     markersGroup.clearLayers();
 
-                    optimizedRoute.forEach(function(pt, idx) {{
+                    currentOptimizedRoute.forEach(function(pt, idx) {{
                         var iconClass = 'number-icon';
                         var labelText = idx.toString();
 
                         if (idx === 0) {{
                             labelText = '🏁';
                             iconClass = 'start-end-icon';
-                        }} else if (idx === optimizedRoute.length - 1) {{
+                        }} else if (idx === currentOptimizedRoute.length - 1) {{
                             return;
                         }}
 
@@ -613,7 +627,7 @@ if df is not None:
                         markersGroup.addLayer(m);
                     }});
 
-                    var waypoints = optimizedRoute.map(function(pt) {{
+                    var waypoints = currentOptimizedRoute.map(function(pt) {{
                         return L.latLng(pt.lat, pt.lng);
                     }});
 
@@ -633,11 +647,56 @@ if df is not None:
                     }}).addTo(map);
                 }}
 
+                // Hàm mở Google Maps với lộ trình đã được sắp xếp
+                function openGoogleMaps() {{
+                    if (targets.length === 0) {{
+                        alert("Vui lòng chọn ít nhất 1 tập điểm.");
+                        return;
+                    }}
+
+                    var routePoints = [];
+
+                    if (currentOptimizedRoute && currentOptimizedRoute.length > 0) {{
+                        routePoints = currentOptimizedRoute.slice(0, currentOptimizedRoute.length - 1);
+                    }} else {{
+                        if (userLatLng) {{
+                            routePoints.push({{ lat: userLatLng.lat, lng: userLatLng.lng }});
+                        }}
+                        targets.forEach(function(pt) {{ routePoints.push(pt); }});
+                    }}
+
+                    if (routePoints.length < 2) {{
+                        alert("Không đủ điểm để tạo lộ trình trên Google Maps.");
+                        return;
+                    }}
+
+                    var origin = routePoints[0].lat + "," + routePoints[0].lng;
+                    var destination = routePoints[routePoints.length - 1].lat + "," + routePoints[routePoints.length - 1].lng;
+                    
+                    var waypointsArr = [];
+                    for (var i = 1; i < routePoints.length - 1; i++) {{
+                        waypointsArr.push(routePoints[i].lat + "," + routePoints[i].lng);
+                    }}
+
+                    var mapsUrl = "https://www.google.com/maps/dir/?api=1" +
+                        "&origin=" + encodeURIComponent(origin) +
+                        "&destination=" + encodeURIComponent(destination);
+
+                    if (waypointsArr.length > 0) {{
+                        mapsUrl += "&waypoints=" + encodeURIComponent(waypointsArr.join("|"));
+                    }}
+
+                    mapsUrl += "&travelmode=driving";
+
+                    window.open(mapsUrl, '_blank');
+                }}
+
                 var CustomControls = L.Control.extend({{
                     options: {{ position: 'topleft' }},
                     onAdd: function (map) {{
                         var container = L.DomUtil.create('div', 'custom-btn-container');
 
+                        // 1. Nút GPS
                         var btnLocate = L.DomUtil.create('div', 'leaflet-control-btn btn-blue-neon', container);
                         btnLocate.innerHTML = '🎯 GPS';
                         btnLocate.onclick = function() {{
@@ -648,12 +707,21 @@ if df is not None:
                             }}
                         }};
 
+                        // 2. Nút Tối ưu lộ trình
                         var btnRoute = L.DomUtil.create('div', 'leaflet-control-btn btn-orange-neon', container);
                         btnRoute.innerHTML = '🚀 Tối ưu lộ trình';
                         btnRoute.onclick = function() {{
                             optimizeAndRoute(false);
                         }};
 
+                        // 3. Nút Google Maps
+                        var btnGmaps = L.DomUtil.create('div', 'leaflet-control-btn btn-gmaps-neon', container);
+                        btnGmaps.innerHTML = '🗺️ Google Maps';
+                        btnGmaps.onclick = function() {{
+                            openGoogleMaps();
+                        }};
+
+                        // 4. Nút Menu Sidebar
                         var btnToggleSidebar = L.DomUtil.create('div', 'leaflet-control-btn btn-green-neon', container);
                         btnToggleSidebar.innerHTML = '👁️ Menu';
                         btnToggleSidebar.onclick = function() {{
