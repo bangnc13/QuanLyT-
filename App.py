@@ -11,10 +11,10 @@ import streamlit.components.v1 as components
 st.set_page_config(
     page_title="Xác Định Vị Trí Đứt Cáp - BangNC13", 
     layout="wide", 
-    initial_sidebar_state="collapsed"  # Tự động thu gọn Sidebar trên di động
+    initial_sidebar_state="expanded"
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen & Mobile Optimization
+# CSS Tùy chỉnh giao diện Fullscreen & Sidebar
 st.markdown("""
     <style>
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
@@ -92,6 +92,48 @@ def haversine_distance(coord1, coord2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
+# Thuật toán tìm đường đi tối ưu khứ hồi (TSP)
+def solve_tsp(start_coords, target_nodes, node_coords_dict):
+    # Lọc các node hợp lệ có tọa độ
+    valid_targets = [n for n in target_nodes if n in node_coords_dict]
+    if not valid_targets:
+        return [], 0.0
+
+    nodes = valid_targets.copy()
+    num_nodes = len(nodes)
+    
+    # Nếu số lượng điểm nhỏ (<= 9), giải chính xác bằng hoán vị
+    if num_nodes <= 9:
+        best_path = None
+        min_dist = float('inf')
+        for perm in itertools.permutations(nodes):
+            current_dist = haversine_distance(start_coords, node_coords_dict[perm[0]])
+            for i in range(len(perm) - 1):
+                current_dist += haversine_distance(node_coords_dict[perm[i]], node_coords_dict[perm[i+1]])
+            current_dist += haversine_distance(node_coords_dict[perm[-1]], start_coords)
+            
+            if current_dist < min_dist:
+                min_dist = current_dist
+                best_path = list(perm)
+        return best_path, min_dist
+    else:
+        # Sử dụng giải thuật Lân cận gần nhất (Nearest Neighbor) cho tập điểm lớn hơn
+        unvisited = nodes.copy()
+        current_coord = start_coords
+        path = []
+        total_dist = 0.0
+        
+        while unvisited:
+            next_node = min(unvisited, key=lambda n: haversine_distance(current_coord, node_coords_dict[n]))
+            dist = haversine_distance(current_coord, node_coords_dict[next_node])
+            total_dist += dist
+            current_coord = node_coords_dict[next_node]
+            path.append(next_node)
+            unvisited.remove(next_node)
+            
+        total_dist += haversine_distance(current_coord, start_coords)
+        return path, total_dist
+
 @st.cache_data 
 def load_server_data(): 
     possible_files = [ 
@@ -120,6 +162,7 @@ def load_server_data():
 df, file_name = load_server_data() 
 
 st.sidebar.markdown('<div class="sidebar-title">⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="sidebar-subtitle"></div>', unsafe_allow_html=True)
 
 if df is not None: 
     st.sidebar.success("Make by BangNC13") 
@@ -245,6 +288,11 @@ if df is not None:
         max_selections=15,
         help="Chọn tối đa 15 điểm kết nối để tạo lộ trình xuất phát và quay về vị trí GPS của bạn."
     )
+    
+    if selected_targets:
+        st.sidebar.info(f"Đã chọn **{len(selected_targets)}/15** điểm.")
+        if st.sidebar.button("🗺️ Tạo Lộ Trình Tối Ưu", type="primary", use_container_width=True):
+            st.session_state.tsp_targets = selected_targets
 
     # Hiển thị kết quả xác định đứt cáp
     if st.session_state.break_result: 
@@ -290,12 +338,14 @@ if df is not None:
                 "color": "#EF4444",
                 "weight": 6,
                 "opacity": 0.9,
+                "tooltip": f"Sự cố đoạn: {st.session_state.break_result['cable']}"
             })
 
             for node in [u, v]: 
                 markers.append({
                     "coords": node_coords[node],
                     "popup": f"<b>Điểm Kết Nối:</b> {node}",
+                    "tooltip": f"Điểm KN: {node}",
                     "color": "#3B82F6",
                     "radius": 7
                 })
@@ -324,13 +374,14 @@ if df is not None:
                     text-decoration: none;
                     font-weight: bold;
                     font-size: 11px;
-                ">🚗 Mở Google Maps</a>
+                ">🚗 Mở dẫn đường trên App Google Maps</a>
             </div>
             """
             
             break_marker = {
                 "coords": list(st.session_state.break_gps),
-                "popup": popup_html
+                "popup": popup_html,
+                "tooltip": "🚨 Vị trí đứt cáp dự kiến"
             }
 
     else: 
@@ -340,13 +391,15 @@ if df is not None:
                     "coords": [node_coords[u], node_coords[v]],
                     "color": "#2B5C8F",
                     "weight": 3,
-                    "opacity": 0.6
+                    "opacity": 0.6,
+                    "tooltip": f"Cáp: {data.get('cable', '')}"
                 })
 
         for node_id, coord in node_coords.items(): 
             markers.append({
                 "coords": coord,
                 "popup": f"<b>Điểm KN:</b> {node_id}",
+                "tooltip": str(node_id),
                 "color": "#2B5C8F",
                 "radius": 4
             })
@@ -354,7 +407,7 @@ if df is not None:
     # Chuyển tập danh sách tọa độ các node sang định dạng JSON
     tsp_targets_json = json.dumps({n: node_coords[n] for n in selected_targets if n in node_coords})
 
-    # Leaflet HTML - Tối ưu cho Mobile (Ẩn bảng chỉ đường & Nhãn chữ)
+    # Leaflet HTML
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -381,17 +434,6 @@ if df is not None:
                 height: 100vh;
                 background: #e5e3df;
             }}
-            
-            /* 🔴 BẮT BUỘC ẨN BẢNG CHỈ ĐƯỜNG CHI TIẾT CỦA LEAFLET ROUTING MACHINE */
-            .leaflet-routing-container, 
-            .leaflet-routing-error {{
-                display: none !important;
-                visibility: hidden !important;
-                width: 0 !important;
-                height: 0 !important;
-                opacity: 0 !important;
-            }}
-
             .custom-break-icon {{
                 background-color: #EF4444;
                 border: 2px solid #FFFFFF;
@@ -419,35 +461,41 @@ if df is not None:
                 box-shadow: 0 0 8px rgba(37, 99, 235, 0.8);
             }}
             .tsp-node-marker {{
-                background-color: #EF4444;
+                background-color: #8B5CF6;
                 color: white;
                 border: 2px solid white;
                 border-radius: 50%;
                 font-weight: bold;
-                font-size: 12px;
+                font-size: 11px;
                 text-align: center;
-                line-height: 24px;
-                width: 26px !important;
-                height: 26px !important;
-                margin-left: -13px !important;
-                margin-top: -13px !important;
+                line-height: 20px;
+                width: 22px !important;
+                height: 22px !important;
+                margin-left: -11px !important;
+                margin-top: -11px !important;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.4);
             }}
             .leaflet-control-btn {{
                 background-color: #ffffff;
                 border: 2px solid rgba(0,0,0,0.2);
-                border-radius: 6px;
-                padding: 6px 10px;
+                border-radius: 4px;
+                padding: 4px 8px;
                 cursor: pointer;
-                font-size: 13px;
+                font-size: 14px;
                 font-weight: bold;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                box-shadow: 0 1px 5px rgba(0,0,0,0.4);
                 display: flex;
                 align-items: center;
                 gap: 4px;
             }}
-            .leaflet-control-btn:active {{
-                background-color: #e5e5e5;
+            .leaflet-control-btn:hover {{
+                background-color: #f4f4f4;
+            }}
+            .leaflet-routing-container {{
+                display: none !important;
+            }}
+            .leaflet-bottom {{
+                margin-bottom: 10px;
             }}
         </style>
     </head>
@@ -482,11 +530,12 @@ if df is not None:
                 // Vẽ các tuyến cáp
                 var polylinesData = {json.dumps(polylines)};
                 polylinesData.forEach(function(item) {{
-                    L.polyline(item.coords, {{
+                    var line = L.polyline(item.coords, {{
                         color: item.color,
                         weight: item.weight,
                         opacity: item.opacity
                     }}).addTo(map);
+                    if (item.tooltip) line.bindTooltip(item.tooltip);
                 }});
 
                 // Vẽ các điểm kết nối
@@ -500,6 +549,7 @@ if df is not None:
                         weight: 2
                     }}).addTo(map);
                     if (item.popup) circle.bindPopup(item.popup);
+                    if (item.tooltip) circle.bindTooltip(item.tooltip);
                 }});
 
                 // Vẽ điểm đứt cáp
@@ -508,6 +558,7 @@ if df is not None:
                     var breakIcon = L.divIcon({{ className: 'custom-break-icon' }});
                     var bMarker = L.marker(breakMarkerData.coords, {{ icon: breakIcon }}).addTo(map);
                     if (breakMarkerData.popup) bMarker.bindPopup(breakMarkerData.popup).openPopup();
+                    if (breakMarkerData.tooltip) bMarker.bindTooltip(breakMarkerData.tooltip);
                 }}
 
                 // Quản lý GPS người dùng
@@ -544,9 +595,8 @@ if df is not None:
                 map.locate({{ watch: true, setView: false, enableHighAccuracy: true }});
 
                 var routingControl = null;
-                var tspMarkersGroup = L.layerGroup().addTo(map);
 
-                // Hàm tính khoảng cách Haversine
+                // Hàm tính toán khoảng cách Haversine trên JS
                 function getHaversineDist(c1, c2) {{
                     var R = 6371000;
                     var dLat = (c2.lat - c1.lat) * Math.PI / 180;
@@ -558,22 +608,21 @@ if df is not None:
                     return R * c;
                 }}
 
-                // Giải lộ trình tối ưu khứ hồi (TSP)
+                // Hàm giải thuật lộ trình khứ hồi tối ưu TSP
                 function calculateAndDrawTSP() {{
                     var targetsDict = {tsp_targets_json};
                     var nodeNames = Object.keys(targetsDict);
 
                     if (!userLatLng) {{
-                        alert("Đang xác định GPS... Vui lòng thử lại sau vài giây.");
+                        alert("Chưa có GPS hiện tại! Vui lòng bật định vị.");
                         return;
                     }}
                     if (nodeNames.length === 0) {{
-                        alert("Vui lòng chọn các điểm kết nối ở Sidebar trước!");
+                        alert("Vui lòng chọn ít nhất 1 điểm kết nối trên Sidebar!");
                         return;
                     }}
 
-                    tspMarkersGroup.clearLayers();
-
+                    // Thuật toán Lân cận gần nhất (Nearest Neighbor) giải TSP từ điểm GPS xuất phát
                     var unvisited = nodeNames.slice();
                     var routeWaypoints = [userLatLng];
                     var orderedNodes = [];
@@ -602,39 +651,39 @@ if df is not None:
                         unvisited.splice(nearestIdx, 1);
                     }}
 
+                    // Quay về điểm GPS ban đầu
                     routeWaypoints.push(userLatLng);
 
-                    // Chỉ hiển thị Marker chứa số (1, 2, 3...), KHÔNG dùng Tooltip che màn hình
+                    // Hiển thị các marker đánh số thứ tự di chuyển
                     orderedNodes.forEach(function(nodeName, index) {{
                         var coord = targetsDict[nodeName];
                         var numberIcon = L.divIcon({{
                             className: 'tsp-node-marker',
                             html: (index + 1).toString()
                         }});
-                        
-                        var marker = L.marker(coord, {{ icon: numberIcon }});
-                        marker.bindPopup("<b>Thứ tự " + (index + 1) + ":</b><br/>" + nodeName);
-                        tspMarkersGroup.addLayer(marker);
+                        L.marker(coord, {{ icon: numberIcon }}).addTo(map)
+                            .bindPopup("<b>Điểm " + (index + 1) + ":</b> " + nodeName);
                     }});
 
-                    // Bật tuyến đường di chuyển (Đã ẩn hoàn toàn bảng điều hướng)
+                    // Vẽ đường nối lộ trình di chuyển
                     if (routingControl) map.removeControl(routingControl);
 
                     routingControl = L.Routing.control({{
                         waypoints: routeWaypoints,
                         routeWhileDragging: false,
                         addWaypoints: false,
-                        createMarker: function() {{ return null; }}, // Không tạo marker mặc định của routing
                         show: false,
                         lineOptions: {{
-                            styles: [{{ color: '#059669', opacity: 0.8, weight: 5 }}]
+                            styles: [{{ color: '#8B5CF6', opacity: 0.9, weight: 6 }}]
                         }}
                     }}).addTo(map);
+
+                    alert("Đã tạo lộ trình tối ưu đi qua " + orderedNodes.length + " điểm và quay lại vị trí GPS ban đầu!");
                 }}
 
                 function drawRouteToDestination() {{
                     if (!userLatLng) {{
-                        alert("Đang xác định GPS... Vui lòng thử lại sau!");
+                        alert("Chưa xác định được vị trí GPS hiện tại của bạn.");
                         return;
                     }}
 
@@ -656,39 +705,46 @@ if df is not None:
                         waypoints: [userLatLng, destLatLng],
                         routeWhileDragging: false,
                         addWaypoints: false,
-                        createMarker: function() {{ return null; }},
                         show: false,
                         lineOptions: {{
-                            styles: [{{ color: '#EF4444', opacity: 0.9, weight: 6 }}]
+                            styles: [{{ color: '#059669', opacity: 0.8, weight: 6 }}]
                         }}
                     }}).addTo(map);
                 }}
 
-                // Nút bấm gọn gàng ở góc trên bên trái màn hình
+                // Nút điều khiển trên bản đồ
                 var CustomControls = L.Control.extend({{
                     options: {{ position: 'topleft' }},
                     onAdd: function (map) {{
                         var container = L.DomUtil.create('div', 'leaflet-bar');
                         container.style.display = 'flex';
                         container.style.flexDirection = 'column';
-                        container.style.gap = '6px';
+                        container.style.gap = '5px';
 
                         var btnLocate = L.DomUtil.create('div', 'leaflet-control-btn', container);
                         btnLocate.innerHTML = '🎯 GPS của tôi';
                         btnLocate.onclick = function() {{
                             if (userLatLng) {{
-                                map.setView(userLatLng, 17);
+                                map.setView(userLatLng, 18);
                             }} else {{
-                                map.locate({{ setView: true, maxZoom: 17, enableHighAccuracy: true }});
+                                map.locate({{ setView: true, maxZoom: 18, enableHighAccuracy: true }});
                             }}
                         }};
 
                         var btnTSP = L.DomUtil.create('div', 'leaflet-control-btn', container);
-                        btnTSP.innerHTML = '🚀 Tối ưu lộ trình di chuyển';
-                        btnTSP.style.backgroundColor = '#10B981';
+                        btnTSP.innerHTML = '🔄 Lộ trình 15 điểm tối ưu';
+                        btnTSP.style.backgroundColor = '#8B5CF6';
                         btnTSP.style.color = '#FFFFFF';
                         btnTSP.onclick = function() {{
                             calculateAndDrawTSP();
+                        }};
+
+                        var btnRoute = L.DomUtil.create('div', 'leaflet-control-btn', container);
+                        btnRoute.innerHTML = '🚗 Chỉ đường tới điểm đứt cáp';
+                        btnRoute.style.backgroundColor = '#10B981';
+                        btnRoute.style.color = '#FFFFFF';
+                        btnRoute.onclick = function() {{
+                            drawRouteToDestination();
                         }};
 
                         return container;
@@ -702,7 +758,7 @@ if df is not None:
     </html>
     """
 
-    # Render bản đồ tràn toàn bộ màn hình
+    # Render bản đồ
     components.html(leaflet_html, height=1000, scrolling=False)
 
 else:
