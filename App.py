@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt & Nút bấm Toggle xanh Neon
+# CSS Tùy chỉnh giao diện Fullscreen, Sidebar TRONG SUỐT 100%
 st.markdown("""
     <style>
         /* 1. Thiết lập tràn màn hình tuyệt đối */
@@ -23,22 +23,30 @@ st.markdown("""
             background-color: transparent !important;
         }
 
-        /* 2. LÀM TRONG SUỐT SIDEBAR (MENU) */
+        /* 2. LÀM TRONG SUỐT 100% HOÀN TOÀN CHO SIDEBAR (MENU) */
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
-            background-color: rgba(255, 255, 255, 0.4) !important; /* Độ trong suốt 40% */
-            backdrop-filter: blur(12px) !important; /* Hiệu ứng làm mờ kính giúp dễ đọc chữ */
-            -webkit-backdrop-filter: blur(12px) !important;
-            border-right: 1px solid rgba(255, 255, 255, 0.3) !important; /* Viền mờ tinh tế */
-            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.05) !important;
+            background-color: transparent !important; /* Loại bỏ hoàn toàn màu nền */
+            background: transparent !important;
+            backdrop-filter: none !important; /* Bỏ hoàn toàn hiệu ứng blur */
+            -webkit-backdrop-filter: none !important;
+            border-right: none !important; /* Bỏ viền bên phải */
+            box-shadow: none !important; /* Bỏ bóng đổ */
         }
 
-        /* Điều chỉnh container bên trong Sidebar */
+        /* Điều chỉnh container bên trong Sidebar cũng trong suốt 100% */
         section[data-testid="stSidebar"] > div:first-child {
+            background-color: transparent !important;
             background: transparent !important;
             padding-top: 1.5rem !important;
             padding-left: 1rem !important;
             padding-right: 1rem !important;
+        }
+
+        /* Tùy chỉnh nhẹ các thẻ bên trong Sidebar để dễ nhìn trên nền bản đồ */
+        .stMultiSelect, .stButton, div[data-baseweb="select"] {
+            background-color: rgba(255, 255, 255, 0.85) !important; /* Nút/ô nhập liệu có nền mờ nhẹ để không bị chìm */
+            border-radius: 8px !important;
         }
 
         /* 3. BO TRÒN VÀ MÀU XANH NEON CHO NÚT MỞ/ẨN SIDEBAR CỦA STREAMLIT */
@@ -61,15 +69,17 @@ st.markdown("""
 
         .sidebar-title {
             font-size: 1.15rem !important;
-            font-weight: 700 !important;
-            color: #111827 !important;
+            font-weight: 800 !important;
+            color: #000000 !important;
+            text-shadow: 0 0 4px #ffffff, 0 0 8px #ffffff !important; /* Viền chữ trắng giúp đọc rõ trên bản đồ */
             margin-bottom: 2px !important;
         }
         .sidebar-subtitle {
             font-size: 0.8rem !important;
-            color: #374151 !important;
+            color: #111827 !important;
+            text-shadow: 0 0 4px #ffffff, 0 0 8px #ffffff !important;
             margin-bottom: 12px !important;
-            font-weight: 500 !important;
+            font-weight: 600 !important;
         }
 
         header[data-testid="stHeader"] {
