@@ -718,7 +718,7 @@ if df is not None:
 
                         // 2. Nút Tối ưu lộ trình Xe máy
                         var btnRoute = L.DomUtil.create('div', 'leaflet-control-btn btn-orange-neon', container);
-                        btnRoute.innerHTML = '🛵 update lộ trình';
+                        btnRoute.innerHTML = '🛵 Update lộ trình';
                         btnRoute.onclick = function() {{
                             optimizeAndRoute(false);
                         }};
