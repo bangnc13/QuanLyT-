@@ -1,6 +1,5 @@
 import os
 import json
-import math
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
@@ -12,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen & Sidebar (Kế thừa từ app.py cũ)
+# CSS Tùy chỉnh giao diện Fullscreen & Sidebar
 st.markdown("""
     <style>
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
@@ -102,6 +101,10 @@ df, file_name = load_excel_data()
 st.sidebar.markdown('<div class="sidebar-title">🗺️ TỐI ƯU LỘ TRÌNH TẬP ĐIỂM</div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="sidebar-subtitle">Định vị GPS Realtime & Tối ưu lộ trình đi qua các điểm</div>', unsafe_allow_html=True)
 
+# Khởi tạo session state kích hoạt tối ưu từ sidebar
+if "trigger_optimize" not in st.session_state:
+    st.session_state.trigger_optimize = False
+
 if df is not None: 
     df.columns = [str(col).strip() for col in df.columns] 
     
@@ -110,7 +113,6 @@ if df is not None:
     lat_col = next((c for c in df.columns if any(k in c.lower() for k in ['lat', 'vĩ độ', 'vi do'])), None) 
     lon_col = next((c for c in df.columns if any(k in c.lower() for k in ['lng', 'lon', 'kinh độ', 'kinh do'])), None) 
 
-    # Nếu file theo định dạng kết nối 2 đầu (VD: Lat1, Lng1, Lat2, Lng2)
     points_dict = {}
     if lat_col and lon_col:
         for _, row in df.iterrows():
@@ -124,7 +126,6 @@ if df is not None:
             except Exception:
                 pass
     else:
-        # Trường hợp tìm cột Lat1/Lng1/Lat2/Lng2
         lat_col1 = next((c for c in df.columns if 'lat' in c.lower() and '1' in c.lower()), None) 
         lon_col1 = next((c for c in df.columns if ('lng' in c.lower() or 'lon' in c.lower()) and '1' in c.lower()), None)
         k1_col = next((c for c in df.columns if 'kn1' in c.lower() or 'điểm 1' in c.lower()), name_col)
@@ -141,7 +142,6 @@ if df is not None:
                 except Exception:
                     pass
 
-    # Lọc danh sách điểm cần đi
     all_point_names = sorted(list(points_dict.keys()))
     
     st.sidebar.markdown("---")
@@ -164,12 +164,15 @@ if df is not None:
 
     st.sidebar.info(f"Đã chọn **{len(selected_data)}** tập điểm.")
 
-    # Tọa độ mặc định hiển thị bản đồ
+    # 🔘 NÚT TỐI ƯU LỘ TRÌNH TRÊN SIDEBAR
+    if st.sidebar.button("🚀 Tối ưu lộ trình di chuyển", type="primary", use_container_width=True):
+        st.session_state.trigger_optimize = True
+
     map_center = [21.0285, 105.8542]
     if len(selected_data) > 0:
         map_center = [selected_data[0]["lat"], selected_data[0]["lng"]]
 
-    # Giao diện Leaflet tích hợp GPS + Tối ưu lộ trình qua JavaScript
+    # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -208,6 +211,29 @@ if df is not None:
                 margin-top: -10px !important;
                 box-shadow: 0 0 10px rgba(37, 99, 235, 0.8);
             }}
+            /* CSS Đánh số thứ tự các điểm trên bản đồ */
+            .number-icon {{
+                background-color: #EF4444;
+                color: #FFFFFF;
+                border: 2px solid #FFFFFF;
+                border-radius: 50%;
+                font-weight: bold;
+                font-size: 13px;
+                text-align: center;
+                line-height: 22px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            }}
+            .start-end-icon {{
+                background-color: #10B981;
+                color: #FFFFFF;
+                border: 2px solid #FFFFFF;
+                border-radius: 50%;
+                font-weight: bold;
+                font-size: 12px;
+                text-align: center;
+                line-height: 22px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            }}
             .leaflet-control-btn {{
                 background-color: #ffffff;
                 border: 2px solid rgba(0,0,0,0.2);
@@ -241,7 +267,6 @@ if df is not None:
         <div id="map"></div>
         <script>
             document.addEventListener("DOMContentLoaded", function() {{
-                // 1. Google Maps Tiles
                 var googleStreets = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}', {{
                     maxZoom: 20,
                     attribution: 'Google Maps'
@@ -258,27 +283,31 @@ if df is not None:
                     layers: [googleStreets]
                 }}).setView({json.dumps(map_center)}, 14);
 
-                // Control vị trí zoom & layer
                 L.control.zoom({{ position: 'bottomleft' }}).addTo(map);
                 L.control.layers({{ "🗺️ Đường phố": googleStreets, "🛰️ Vệ tinh": googleSat }}, null, {{ position: 'bottomright' }}).addTo(map);
 
-                // Danh sách điểm từ Excel đã chọn
                 var targets = {json.dumps(selected_data)};
+                var markersGroup = L.layerGroup().addTo(map);
 
-                // Hiển thị Marker các tập điểm
-                targets.forEach(function(pt, idx) {{
-                    var marker = L.circleMarker([pt.lat, pt.lng], {{
-                        radius: 7,
-                        color: '#EF4444',
-                        fillColor: '#FFFFFF',
-                        fillOpacity: 0.9,
-                        weight: 3
-                    }}).addTo(map);
-                    marker.bindPopup("<b>Tập điểm:</b> " + pt.name);
-                    marker.bindTooltip(pt.name, {{ permanent: false, direction: 'top' }});
-                }});
+                // Vẽ các điểm ban đầu
+                function renderInitialMarkers() {{
+                    markersGroup.clearLayers();
+                    targets.forEach(function(pt) {{
+                        var marker = L.circleMarker([pt.lat, pt.lng], {{
+                            radius: 8,
+                            color: '#EF4444',
+                            fillColor: '#FFFFFF',
+                            fillOpacity: 0.9,
+                            weight: 3
+                        }});
+                        marker.bindPopup("<b>Tập điểm:</b> " + pt.name);
+                        marker.bindTooltip(pt.name, {{ permanent: false, direction: 'top' }});
+                        markersGroup.addLayer(marker);
+                    }});
+                }}
+                renderInitialMarkers();
 
-                // Định vị GPS Realtime người dùng
+                // Định vị GPS
                 var userLatLng = null;
                 var userMarker = null;
                 var accuracyCircle = null;
@@ -309,9 +338,9 @@ if df is not None:
                 }});
                 map.locate({{ watch: true, setView: false, enableHighAccuracy: true }});
 
-                // Thuật toán Haversine tính khoảng cách giữa 2 điểm
+                // Thuật toán Haversine
                 function getDistance(lat1, lon1, lat2, lon2) {{
-                    var R = 6371; // km
+                    var R = 6371;
                     var dLat = (lat2 - lat1) * Math.PI / 180;
                     var dLon = (lon2 - lon1) * Math.PI / 180;
                     var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -321,7 +350,7 @@ if df is not None:
                     return R * c;
                 }}
 
-                // Thuật toán TSP Nearest Neighbor: Xuất phát từ GPS -> Đi qua hết các tập điểm -> Quay về GPS
+                // Giải bài toán TSP
                 function solveTSP(startPt, pts) {{
                     var unvisited = pts.slice();
                     var route = [startPt];
@@ -344,7 +373,7 @@ if df is not None:
                         unvisited.splice(nearestIdx, 1);
                     }}
 
-                    // Kết thúc quay trở lại điểm xuất phát (GPS)
+                    // Quay về điểm GPS ban đầu
                     route.push(startPt);
                     return route;
                 }}
@@ -353,7 +382,7 @@ if df is not None:
 
                 function optimizeAndRoute() {{
                     if (!userLatLng) {{
-                        alert("Đang bắt tín hiệu GPS... Vui lòng bật vị trí trên trình duyệt và thử lại.");
+                        alert("Đang bắt tín hiệu GPS... Vui lòng bật quyền vị trí trên trình duyệt và thử lại.");
                         return;
                     }}
 
@@ -364,6 +393,34 @@ if df is not None:
 
                     var startPoint = {{ name: "Điểm Xuất Phát (GPS)", lat: userLatLng.lat, lng: userLatLng.lng }};
                     var optimizedRoute = solveTSP(startPoint, targets);
+
+                    // Xóa marker cũ và thay bằng Marker có ĐÁNH SỐ THỨ TỰ
+                    markersGroup.clearLayers();
+
+                    optimizedRoute.forEach(function(pt, idx) {{
+                        var iconClass = 'number-icon';
+                        var labelText = idx.toString();
+
+                        if (idx === 0) {{
+                            labelText = '🏁';
+                            iconClass = 'start-end-icon';
+                        }} else if (idx === optimizedRoute.length - 1) {{
+                            return; // Điểm cuối trùng điểm xuất phát
+                        }}
+
+                        var numIcon = L.divIcon({{
+                            className: iconClass,
+                            html: labelText,
+                            iconSize: [26, 26],
+                            iconAnchor: [13, 13]
+                        }});
+
+                        var m = L.marker([pt.lat, pt.lng], {{ icon: numIcon }});
+                        var popupMsg = idx === 0 ? "<b>Điểm Xuất Phát (GPS)</b>" : "<b>Thứ tự " + idx + ":</b> " + pt.name;
+                        m.bindPopup(popupMsg);
+                        m.bindTooltip(idx === 0 ? "Xuất phát (GPS)" : "Thứ tự " + idx + ": " + pt.name, {{ permanent: true, direction: 'top' }});
+                        markersGroup.addLayer(m);
+                    }});
 
                     var waypoints = optimizedRoute.map(function(pt) {{
                         return L.latLng(pt.lat, pt.lng);
@@ -379,12 +436,12 @@ if df is not None:
                         addWaypoints: false,
                         show: true,
                         lineOptions: {{
-                            styles: [{{ color: '#10B981', opacity: 0.8, weight: 6 }}]
+                            styles: [{{ color: '#10B981', opacity: 0.85, weight: 6 }}]
                         }}
                     }}).addTo(map);
                 }}
 
-                // Control Nút điều khiển góc trên bên trái
+                // Nút điều khiển nhanh góc trên trái
                 var CustomControls = L.Control.extend({{
                     options: {{ position: 'topleft' }},
                     onAdd: function (map) {{
@@ -416,6 +473,14 @@ if df is not None:
                 }});
 
                 map.addControl(new CustomControls());
+
+                // Tự động kích hoạt khi bấm nút trên Sidebar
+                var autoOptimize = {json.dumps(st.session_state.trigger_optimize)};
+                if (autoOptimize) {{
+                    setTimeout(function() {{
+                        optimizeAndRoute();
+                    }}, 800);
+                }}
             }});
         </script>
     </body>
