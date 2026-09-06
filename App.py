@@ -163,7 +163,7 @@ else:
   st.sidebar.caption("📷 *[FPT Telecom Logo]*")
 
 st.sidebar.markdown(
-    '<div class="sidebar-title">Tối Ưu Lộ Trình</div>', unsafe_allow_html=True
+    '<div class="sidebar-title">Make by BangNC13</div>', unsafe_allow_html=True
 )
 st.sidebar.markdown(
     '<div class="sidebar-subtitle">Tối ưu quãng đường thu cước - Make by'
