@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt & Nút bấm Toggle xanh Neon
+# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Blur & Nút bấm Toggle xanh Neon
 st.markdown(
     """
     <style>
@@ -24,25 +24,42 @@ st.markdown(
             background-color: transparent !important;
         }
 
-        /* 2. LÀM TRONG SUỐT SIDEBAR (MENU) */
+        /* 2. LÀM TRONG SUỐT VÀ MỜ KÍNH CHO SIDEBAR (MENU) */
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
             background-color: rgba(255, 255, 255, 0.4) !important; /* Độ trong suốt 40% */
-            backdrop-filter: blur(12px) !important; /* Hiệu ứng làm mờ kính giúp dễ đọc chữ */
+            backdrop-filter: blur(12px) !important; /* Hiệu ứng làm mờ kính */
             -webkit-backdrop-filter: blur(12px) !important;
-            border-right: 1px solid rgba(255, 255, 255, 0.3) !important; /* Viền mờ tinh tế */
+            border-right: 1px solid rgba(255, 255, 255, 0.3) !important;
             box-shadow: 4px 0 15px rgba(0, 0, 0, 0.05) !important;
         }
 
         /* Điều chỉnh container bên trong Sidebar */
         section[data-testid="stSidebar"] > div:first-child {
             background: transparent !important;
-            padding-top: 1.5rem !important;
+            padding-top: 1rem !important;
             padding-left: 1rem !important;
             padding-right: 1rem !important;
         }
 
-        /* 3. BO TRÒN VÀ MÀU XANH NEON CHO NÚT MỞ/ẨN SIDEBAR CỦA STREAMLIT */
+        /* 3. TÙY CHỈNH NỀN CỦA LOGO ĐỒNG BỘ HIỆU ỨNG BLUR CỦA MENU */
+        [data-testid="stSidebar"] [data-testid="stImage"] {
+            background: rgba(255, 255, 255, 0.2) !important;
+            backdrop-filter: blur(12px) !important;
+            -webkit-backdrop-filter: blur(12px) !important;
+            border-radius: 12px !important;
+            padding: 8px !important;
+            margin-bottom: 12px !important;
+            border: 1px solid rgba(255, 255, 255, 0.4) !important;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03) !important;
+        }
+        
+        [data-testid="stSidebar"] [data-testid="stImage"] img {
+            border-radius: 8px !important;
+            object-fit: contain !important;
+        }
+
+        /* 4. BO TRÒN VÀ MÀU XANH NEON CHO NÚT MỞ/ẨN SIDEBAR CỦA STREAMLIT */
         [data-testid="stSidebarCollapseButton"], 
         [data-testid="stSidebarNavItems"] button,
         button[aria-label="Close sidebar"],
@@ -138,12 +155,11 @@ def load_excel_data():
 df, file_name = load_excel_data()
 
 # -------------------------------------------------------------
-# THÊM LOGO VÀO TRÊN CÙNG SIDEBAR
+# LOGO VÀO TRÊN CÙNG SIDEBAR CÓ NỀN KÍNH MỜ (BLUR)
 # -------------------------------------------------------------
 if os.path.exists("FPT_Telecom_logo.png"):
   st.sidebar.image("FPT_Telecom_logo.png", use_container_width=True)
 else:
-  # Có thể dùng đường dẫn URL dự phòng nếu file chưa nằm cùng folder code
   st.sidebar.caption("📷 *[FPT Telecom Logo]*")
 
 st.sidebar.markdown(
