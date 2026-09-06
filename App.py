@@ -8,10 +8,10 @@ import streamlit.components.v1 as components
 st.set_page_config(
     page_title="Tối Ưu Lộ Trình Di Chuyển",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Trong Suốt, Nút bấm Toggle xanh Neon & Hiệu ứng nhấp nháy
+# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Trong Suốt & Sửa lỗi mất danh sách chọn
 st.markdown(
     """
     <style>
@@ -28,7 +28,6 @@ st.markdown(
         .styles_viewerBadge__1yB5_,
         [data-testid="stStatusWidget"],
         [data-testid="stConnectionStatus"],
-        .stAppViewBlockContainer iframe,
         div[class*="viewerBadge"],
         div[class*="styles_viewerBadge"],
         a[href*="streamlit.io"] {
@@ -47,7 +46,7 @@ st.markdown(
         }
 
         /* ========================================================= */
-        /* 1. Thiết lập tràn màn hình tuyệt đối */
+        /* 1. Thiết lập giao diện tràn màn hình nhưng CHO PHÉP CUỘN SIDEBAR */
         /* ========================================================= */
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
             margin: 0 !important;
@@ -57,22 +56,32 @@ st.markdown(
             background-color: transparent !important;
         }
 
-        /* 2. LÀM TRONG SUỐT VÀ MỜ KÍNH CHO SIDEBAR (MENU) */
+        /* 2. LÀM TRONG SUỐT VÀ CHO PHÉP CUỘN DỌC TRONG SIDEBAR */
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
-            background-color: rgba(255, 255, 255, 0.4) !important;
+            background-color: rgba(255, 255, 255, 0.45) !important;
             backdrop-filter: blur(12px) !important;
             -webkit-backdrop-filter: blur(12px) !important;
             border-right: 1px solid rgba(255, 255, 255, 0.3) !important;
             box-shadow: 4px 0 15px rgba(0, 0, 0, 0.05) !important;
+            overflow-y: auto !important; /* Cho phép cuộn khi danh sách quá dài */
         }
 
-        /* Điều chỉnh container bên trong Sidebar */
+        /* Điều chỉnh container bên trong Sidebar để không bị cắt bớt nội dung */
         section[data-testid="stSidebar"] > div:first-child {
             background: transparent !important;
             padding-top: 1rem !important;
             padding-left: 1rem !important;
             padding-right: 1rem !important;
+            padding-bottom: 3rem !important; /* Thêm khoảng trống ở đáy để cuộn dễ dàng */
+            height: auto !important;
+            max-height: 100vh !important;
+            overflow-y: auto !important;
+        }
+
+        /* SỬA LỖI MENU DROP-DOWN CHO MULTISELECT: Đảm bảo popup danh sách hiện lên trên cùng */
+        div[data-baseweb="popover"], div[aria-label="dropdown menu"] {
+            z-index: 1000005 !important;
         }
 
         /* 3. LÀM NỀN LOGO TRONG SUỐT HOÀN TOÀN */
@@ -124,7 +133,7 @@ st.markdown(
             font-weight: 500 !important;
         }
 
-        /* HIỆU ỨNG NHẤP NHÁY / NHỊP THỜ PHÁT SÁNG CHO NÚT SIDEBAR */
+        /* HIỆU ỨNG NHẤP NHÁY CHO NÚT SIDEBAR */
         @keyframes pulseGlow {
             0% {
                 box-shadow: 0 0 8px #FF6600, 0 0 15px rgba(255, 102, 0, 0.4);
@@ -140,7 +149,6 @@ st.markdown(
             }
         }
 
-        /* Áp dụng hiệu ứng nhấp nháy vào nút bấm Tối ưu lộ trình ở sidebar */
         [data-testid="stSidebar"] div.stButton > button {
             animation: pulseGlow 1.8s infinite ease-in-out !important;
             border-radius: 20px !important;
@@ -207,9 +215,7 @@ def load_excel_data():
 
 df, file_name = load_excel_data()
 
-# -------------------------------------------------------------
-# LOGO VÀO TRÊN CÙNG SIDEBAR CÓ NỀN TRONG SUỐT
-# -------------------------------------------------------------
+# LOGO VÀO TRÊN CÙNG SIDEBAR
 if os.path.exists("FPT_Telecom_logo.png"):
     st.sidebar.image("FPT_Telecom_logo.png", use_container_width=True)
 else:
@@ -223,11 +229,9 @@ st.sidebar.markdown(
     unsafe_allow_html=True,
 )
 
-# Khởi tạo session state kích hoạt tối ưu từ sidebar
 if "trigger_optimize" not in st.session_state:
     st.session_state.trigger_optimize = False
 
-# 🔘 NÚT TỐI ƯU LỘ TRÌNH ĐẶT NGAY DƯỚI "Make by BangNC13"
 if st.sidebar.button(
     "🚀 Tối ưu lộ trình ", type="primary", use_container_width=True
 ):
@@ -236,7 +240,6 @@ if st.sidebar.button(
 if df is not None:
     df.columns = [str(col).strip() for col in df.columns]
 
-    # Tìm tự động các cột Tên điểm, Vĩ độ (Lat), Kinh độ (Lng)
     name_col = next(
         (
             c
@@ -371,7 +374,6 @@ if df is not None:
                 background: #e5e3df;
             }}
 
-            /* ẨN TOÀN BỘ CÁC BIỂU TƯỢNG VÀ NÚT Ở GÓC DƯỚI BÊN PHẢI BẢN ĐỒ */
             .leaflet-bottom.leaflet-right {{
                 display: none !important;
                 visibility: hidden !important;
@@ -442,7 +444,6 @@ if df is not None:
                 transform: translateY(-2px);
             }}
 
-            /* 1. NÚT GPS: NỀN XANH DƯƠNG - BO VIỀN NEON XANH DƯƠNG */
             .btn-blue-neon {{
                 background-color: #0066FF !important;
                 color: #FFFFFF !important;
@@ -454,7 +455,6 @@ if df is not None:
                 box-shadow: 0 0 15px #0066FF, 0 0 25px rgba(51, 153, 255, 1) !important;
             }}
 
-            /* 2. NÚT TỐI ƯU LỘ TRÌNH: NỀN CAM - BO VIỀN NEON CAM */
             .btn-orange-neon {{
                 background-color: #FF6600 !important;
                 color: #FFFFFF !important;
@@ -466,7 +466,6 @@ if df is not None:
                 box-shadow: 0 0 15px #FF6600, 0 0 25px rgba(255, 153, 51, 1) !important;
             }}
 
-            /* 3. NÚT GOOGLE MAPS: NỀN TÍM NEON */
             .btn-purple-neon {{
                 background-color: #8B5CF6 !important;
                 color: #FFFFFF !important;
@@ -478,7 +477,6 @@ if df is not None:
                 box-shadow: 0 0 15px #8B5CF6, 0 0 25px rgba(167, 139, 250, 1) !important;
             }}
 
-            /* 4. NÚT MENU: NỀN XANH LÁ - BO VIỀN NEON XANH LÁ */
             .btn-green-neon {{
                 background-color: #00CC44 !important;
                 color: #FFFFFF !important;
@@ -531,7 +529,6 @@ if df is not None:
                 }}
                 renderInitialMarkers();
 
-                // Định vị GPS
                 var userLatLng = null;
                 var userMarker = null;
                 var accuracyCircle = null;
@@ -675,7 +672,6 @@ if df is not None:
                     return optimizedRoute;
                 }}
 
-                // Hàm mở ứng dụng Google Maps
                 function openGoogleMapsApp() {{
                     var route = currentOptimizedRoute;
                     if (!route) {{
@@ -687,7 +683,6 @@ if df is not None:
                         return;
                     }}
 
-                    // Loại bỏ điểm cuối lặp lại xuất phát nếu có
                     var pointsToRoute = route.slice(0, route.length - 1);
 
                     var origin = pointsToRoute[0].lat + "," + pointsToRoute[0].lng;
