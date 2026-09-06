@@ -465,16 +465,16 @@ if st.session_state.route_coords:
         tooltip="Cyber Round-Trip Route"
     ).add_to(m)
 
-# ================= FLOATING ACTION BUTTON GPS TRỰC TIẾP LÊN MAP =================
+# ================= FLOATING ACTION BUTTON GPS Ở CẠNH TRÊN BÊN TRÁI MAP =================
 gps_button_element = folium.Element("""
 <style>
     .leaflet-gps-fab {
         position: fixed !important;
-        bottom: 60px !important;
-        right: 25px !important;
+        top: 25px !important;       /* Cạnh trên */
+        left: 25px !important;      /* Cạnh trái */
         z-index: 999999 !important;
-        width: 52px;
-        height: 52px;
+        width: 48px;
+        height: 48px;
         background: rgba(31, 12, 0, 0.95);
         border: 2px solid #00f0ff;
         border-radius: 50%;
@@ -495,7 +495,7 @@ gps_button_element = folium.Element("""
 </style>
 
 <div class="leaflet-gps-fab" id="map-gps-btn" title="Cập nhật vị trí GPS">
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"></circle>
         <path d="M12 2v3m0 14v3M2 12h3m14 0h3"></path>
     </svg>
