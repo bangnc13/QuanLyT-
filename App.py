@@ -6,7 +6,7 @@ import streamlit.components.v1 as components
 
 # 1. Cấu hình trang Streamlit
 st.set_page_config(
-    page_title="Tối Ưu Lộ Trình Di Chuyển Tập Điểm",
+    page_title="Map make by BangNC13",
     layout="wide",
     initial_sidebar_state="expanded",
 )
