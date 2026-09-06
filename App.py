@@ -283,7 +283,7 @@ if df is not None:
     st.sidebar.subheader("📍 CHỌN CÁC TẬP ĐIỂM CẦN ĐẾN")
 
     selected_points = st.sidebar.multiselect(
-        "Chọn các điểm cần đi qua:",
+        "",
         options=all_point_names,
         default=(
             all_point_names[:5]
@@ -723,7 +723,7 @@ if df is not None:
 
                         // 4. Nút Menu Sidebar
                         var btnToggleSidebar = L.DomUtil.create('div', 'leaflet-control-btn btn-green-neon', container);
-                        btnToggleSidebar.innerHTML = '👁️ Menu';
+                        btnToggleSidebar.innerHTML = ' Menu';
                         btnToggleSidebar.onclick = function() {{
                             var sidebarBtn = window.parent.document.querySelector('[data-testid="stSidebarCollapseButton"] button') ||
                                              window.parent.document.querySelector('button[aria-label="Close sidebar"]') ||
