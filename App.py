@@ -166,8 +166,7 @@ st.sidebar.markdown(
     '<div class="sidebar-title">Make by BangNC13</div>', unsafe_allow_html=True
 )
 st.sidebar.markdown(
-    '<div class="sidebar-subtitle">Tối ưu quãng đường thu cước - Make by'
-    " BangNC13 </div>",
+    '<div class="sidebar-subtitle"> </div>",
     unsafe_allow_html=True,
 )
 
