@@ -15,7 +15,25 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+        /* ========================================================= */
+        /* 0. ẨN TẤT CẢ ICON THANH TRÊN (HEADER/GITHUB) VÀ THANH DƯỚI (FOOTER/WATERMARK) */
+        /* ========================================================= */
+        header[data-testid="stHeader"],
+        [data-testid="stHeader"],
+        [data-testid="stToolbar"],
+        [data-testid="stDecoration"],
+        footer,
+        #MainMenu,
+        .viewerBadge_container__163Vn,
+        .styles_viewerBadge__1yB5_ {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0px !important;
+        }
+
+        /* ========================================================= */
         /* 1. Thiết lập tràn màn hình tuyệt đối */
+        /* ========================================================= */
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
             margin: 0 !important;
             padding: 0 !important;
@@ -91,12 +109,6 @@ st.markdown(
             font-weight: 500 !important;
         }
 
-        header[data-testid="stHeader"] {
-            background: transparent !important;
-            height: 0px !important;
-            z-index: 999999 !important;
-        }
-
         .main .block-container, 
         [data-testid="stMainBlockContainer"],
         [data-testid="stVerticalBlock"],
@@ -167,8 +179,7 @@ st.sidebar.markdown(
     '<div class="sidebar-title"></div>', unsafe_allow_html=True
 )
 st.sidebar.markdown(
-    '<div class="sidebar-subtitle"> Make by'
-    " BangNC13 </div>",
+    '<div class="sidebar-subtitle"> Make by BangNC13 </div>',
     unsafe_allow_html=True,
 )
 
@@ -353,7 +364,7 @@ if df is not None:
             }}
 
             .leaflet-top.leaflet-left {{
-                top: 55px !important;
+                top: 15px !important;
                 left: 10px !important;
             }}
 
