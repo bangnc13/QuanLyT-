@@ -330,6 +330,13 @@ if df is not None:
                 height: 100vh;
                 background: #e5e3df;
             }}
+
+            /* ẨN TOÀN BỘ CÁC BIỂU TƯỢNG VÀ NÚT Ở GÓC DƯỚI BÊN PHẢI BẢN ĐỒ */
+            .leaflet-bottom.leaflet-right {{
+                display: none !important;
+                visibility: hidden !important;
+            }}
+
             .user-location-marker {{
                 background-color: #2563EB;
                 border: 3px solid #FFFFFF;
@@ -423,11 +430,6 @@ if df is not None:
                     attribution: 'Google Maps'
                 }});
 
-                var googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s,h&x={{x}}&y={{y}}&z={{z}}', {{
-                    maxZoom: 20,
-                    attribution: 'Google Maps Satellite'
-                }});
-
                 var map = L.map('map', {{
                     zoomControl: false,
                     attributionControl: false,
@@ -435,7 +437,6 @@ if df is not None:
                 }}).setView({json.dumps(map_center)}, 14);
 
                 L.control.zoom({{ position: 'bottomleft' }}).addTo(map);
-                L.control.layers({{ "🗺️ Đường phố": googleStreets, "🛰️ Vệ tinh": googleSat }}, null, {{ position: 'bottomright' }}).addTo(map);
 
                 var targets = {json.dumps(selected_data)};
                 var markersGroup = L.layerGroup().addTo(map);
