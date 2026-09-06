@@ -251,7 +251,7 @@ if df is not None:
                 background-color: #f4f4f4;
             }}
             
-            /* 🔥 ẨN HÒAN TOÀN BẢNG HƯỚNG DẪN CHỈ ĐƯỜNG (LEAFLET ROUTING CONTAINER) */
+            /* Ẩn bảng hướng dẫn chỉ đường */
             .leaflet-routing-container {{
                 display: none !important;
             }}
@@ -283,7 +283,7 @@ if df is not None:
                 var targets = {json.dumps(selected_data)};
                 var markersGroup = L.layerGroup().addTo(map);
 
-                // Vẽ các điểm ban đầu
+                // Vẽ các điểm ban đầu (Không bật nhãn hiển thị thường trực)
                 function renderInitialMarkers() {{
                     markersGroup.clearLayers();
                     targets.forEach(function(pt) {{
@@ -295,7 +295,6 @@ if df is not None:
                             weight: 3
                         }});
                         marker.bindPopup("<b>Tập điểm:</b> " + pt.name);
-                        marker.bindTooltip(pt.name, {{ permanent: false, direction: 'top' }});
                         markersGroup.addLayer(marker);
                     }});
                 }}
@@ -388,7 +387,7 @@ if df is not None:
                     var startPoint = {{ name: "Điểm Xuất Phát (GPS)", lat: userLatLng.lat, lng: userLatLng.lng }};
                     var optimizedRoute = solveTSP(startPoint, targets);
 
-                    // Xóa marker cũ và thay bằng Marker có ĐÁNH SỐ THỨ TỰ
+                    // Xóa marker cũ và thay bằng Marker có ĐÁNH SỐ THỨ TỰ (Đã loại bỏ chú thích chữ thường trực)
                     markersGroup.clearLayers();
 
                     optimizedRoute.forEach(function(pt, idx) {{
@@ -411,8 +410,9 @@ if df is not None:
 
                         var m = L.marker([pt.lat, pt.lng], {{ icon: numIcon }});
                         var popupMsg = idx === 0 ? "<b>Điểm Xuất Phát (GPS)</b>" : "<b>Thứ tự " + idx + ":</b> " + pt.name;
+                        
+                        // Chỉ hiển thị Popup khi bấm/click vào điểm, không hiển thị nhãn chữ đè lên màn hình
                         m.bindPopup(popupMsg);
-                        m.bindTooltip(idx === 0 ? "Xuất phát (GPS)" : "Thứ tự " + idx + ": " + pt.name, {{ permanent: true, direction: 'top' }});
                         markersGroup.addLayer(m);
                     }});
 
@@ -428,8 +428,8 @@ if df is not None:
                         waypoints: waypoints,
                         routeWhileDragging: false,
                         addWaypoints: false,
-                        show: false, // Tắt giao diện chỉ đường mặc định
-                        createMarker: function() {{ return null; }}, // Không tạo các marker mặc định đè lên
+                        show: false,
+                        createMarker: function() {{ return null; }},
                         lineOptions: {{
                             styles: [{{ color: '#10B981', opacity: 0.85, weight: 6 }}]
                         }}
