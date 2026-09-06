@@ -78,8 +78,8 @@ if "break_result" not in st.session_state:
     st.session_state.break_result = None 
 if "break_gps" not in st.session_state: 
     st.session_state.break_gps = None 
-if "tsp_targets" not in st.session_state:
-    st.session_state.tsp_targets = []
+if "tsp_route" not in st.session_state:
+    st.session_state.tsp_route = None
 
 # Hàm tính khoảng cách Haversine giữa 2 tọa độ GPS (mét)
 def haversine_distance(coord1, coord2):
@@ -91,6 +91,45 @@ def haversine_distance(coord1, coord2):
     a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
+
+# Thuật toán tìm đường đi tối ưu khứ hồi (TSP)
+def solve_tsp(start_coords, target_nodes, node_coords_dict):
+    valid_targets = [n for n in target_nodes if n in node_coords_dict]
+    if not valid_targets:
+        return [], 0.0
+
+    nodes = valid_targets.copy()
+    num_nodes = len(nodes)
+    
+    if num_nodes <= 9:
+        best_path = None
+        min_dist = float('inf')
+        for perm in itertools.permutations(nodes):
+            current_dist = haversine_distance(start_coords, node_coords_dict[perm[0]])
+            for i in range(len(perm) - 1):
+                current_dist += haversine_distance(node_coords_dict[perm[i]], node_coords_dict[perm[i+1]])
+            current_dist += haversine_distance(node_coords_dict[perm[-1]], start_coords)
+            
+            if current_dist < min_dist:
+                min_dist = current_dist
+                best_path = list(perm)
+        return best_path, min_dist
+    else:
+        unvisited = nodes.copy()
+        current_coord = start_coords
+        path = []
+        total_dist = 0.0
+        
+        while unvisited:
+            next_node = min(unvisited, key=lambda n: haversine_distance(current_coord, node_coords_dict[n]))
+            dist = haversine_distance(current_coord, node_coords_dict[next_node])
+            total_dist += dist
+            current_coord = node_coords_dict[next_node]
+            path.append(next_node)
+            unvisited.remove(next_node)
+            
+        total_dist += haversine_distance(current_coord, start_coords)
+        return path, total_dist
 
 @st.cache_data 
 def load_server_data(): 
@@ -185,7 +224,7 @@ if df is not None:
         if btn_reset: 
             st.session_state.break_result = None 
             st.session_state.break_gps = None 
-            st.session_state.tsp_targets = []
+            st.session_state.tsp_route = None
             st.rerun() 
 
         if btn_calc and start_node and direction_node: 
@@ -243,23 +282,14 @@ if df is not None:
     selected_targets = st.sidebar.multiselect(
         "Chọn tập điểm cần di chuyển qua:",
         options=all_nodes,
-        default=st.session_state.tsp_targets,
         max_selections=15,
-        key="multiselect_targets",
         help="Chọn tối đa 15 điểm kết nối để tạo lộ trình xuất phát và quay về vị trí GPS của bạn."
     )
     
-    # Cập nhật session state
-    st.session_state.tsp_targets = selected_targets
-
-    col_tsp1, col_tsp2 = st.sidebar.columns(2)
-    with col_tsp1:
-        if st.sidebar.button("🧹 Clear điểm", use_container_width=True):
-            st.session_state.tsp_targets = []
-            st.rerun()
-
     if selected_targets:
         st.sidebar.info(f"Đã chọn **{len(selected_targets)}/15** điểm.")
+        if st.sidebar.button("🗺️ Tạo Lộ Trình Tối Ưu", type="primary", use_container_width=True):
+            st.session_state.tsp_targets = selected_targets
 
     # Hiển thị kết quả xác định đứt cáp
     if st.session_state.break_result: 
@@ -373,7 +403,6 @@ if df is not None:
 
     # Chuyển tập danh sách tọa độ các node sang định dạng JSON
     tsp_targets_json = json.dumps({n: node_coords[n] for n in selected_targets if n in node_coords})
-    has_break_gps = json.dumps(st.session_state.break_gps is not None)
 
     # Leaflet HTML
     leaflet_html = f"""
@@ -460,7 +489,7 @@ if df is not None:
                 background-color: #f4f4f4;
             }}
             
-            /* Ẩn hoàn toàn bảng chỉ đường và ghi chú lộ trình chi tiết */
+            /* Ẩn hoàn toàn bảng chỉ đường và ghi chú lộ trình chi tiết trên màn hình nhỏ */
             .leaflet-routing-container, 
             .leaflet-routing-error {{
                 display: none !important;
@@ -537,8 +566,6 @@ if df is not None:
                 var userLatLng = null;
                 var userMarker = null;
                 var accuracyCircle = null;
-                var initialCentered = false;
-                var hasBreakGps = {has_break_gps};
 
                 function onLocationFound(e) {{
                     userLatLng = e.latlng;
@@ -557,14 +584,6 @@ if df is not None:
                             fillOpacity: 0.15,
                             weight: 1
                         }}).addTo(map);
-                    }}
-
-                    // Khi vừa xác định được GPS lần đầu, tự động canh giữa màn hình bản đồ vào vị trí người dùng (nếu không đang xem điểm đứt cáp)
-                    if (!initialCentered) {{
-                        initialCentered = true;
-                        if (!hasBreakGps) {{
-                            map.setView(e.latlng, 17);
-                        }}
                     }}
                 }}
 
@@ -656,8 +675,8 @@ if df is not None:
                         waypoints: routeWaypoints,
                         routeWhileDragging: false,
                         addWaypoints: false,
-                        show: false,
-                        createMarker: function() {{ return null; }},
+                        show: false, // Không hiện bảng danh sách từng bước
+                        createMarker: function() {{ return null; }}, // Không tạo thêm marker chỉ đường mặc định
                         lineOptions: {{
                             styles: [{{ color: '#8B5CF6', opacity: 0.9, weight: 5 }}]
                         }}
@@ -690,7 +709,7 @@ if df is not None:
                         waypoints: [userLatLng, destLatLng],
                         routeWhileDragging: false,
                         addWaypoints: false,
-                        show: false,
+                        show: false, // Tắt bảng hiển thị các bước rẽ
                         createMarker: function() {{ return null; }},
                         lineOptions: {{
                             styles: [{{ color: '#059669', opacity: 0.8, weight: 6 }}]
