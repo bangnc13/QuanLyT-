@@ -16,7 +16,7 @@ st.markdown(
     """
     <style>
         /* ========================================================= */
-        /* 0. ẨN TẤT CẢ ICON THANH TRÊN, FOOTER, TOOLBAR STREAMLIT */
+        /* 0. ẨN TẤT CẢ ICON THANH TRÊN, FOOTER VÀ WATERMARK/BADGE CỦA STREAMLIT */
         /* ========================================================= */
         header[data-testid="stHeader"],
         [data-testid="stHeader"],
@@ -25,10 +25,25 @@ st.markdown(
         footer,
         #MainMenu,
         .viewerBadge_container__163Vn,
-        .styles_viewerBadge__1yB5_ {
+        .styles_viewerBadge__1yB5_,
+        [data-testid="stStatusWidget"],
+        [data-testid="stConnectionStatus"],
+        .stAppViewBlockContainer iframe,
+        div[class*="viewerBadge"],
+        div[class*="styles_viewerBadge"],
+        a[href*="streamlit.io"] {
             display: none !important;
             visibility: hidden !important;
+            opacity: 0 !important;
             height: 0px !important;
+            width: 0px !important;
+            pointer-events: none !important;
+        }
+
+        /* Ẩn triệt để các phần tử cố định ở góc dưới màn hình */
+        div[style*="position: fixed"][style*="bottom"],
+        div[style*="position: absolute"][style*="bottom"] {
+            z-index: -999999 !important;
         }
 
         /* ========================================================= */
@@ -45,8 +60,8 @@ st.markdown(
         /* 2. LÀM TRONG SUỐT VÀ MỜ KÍNH CHO SIDEBAR (MENU) */
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
-            background-color: rgba(255, 255, 255, 0.4) !important; /* Độ trong suốt 40% */
-            backdrop-filter: blur(12px) !important; /* Hiệu ứng làm mờ kính */
+            background-color: rgba(255, 255, 255, 0.4) !important;
+            backdrop-filter: blur(12px) !important;
             -webkit-backdrop-filter: blur(12px) !important;
             border-right: 1px solid rgba(255, 255, 255, 0.3) !important;
             box-shadow: 4px 0 15px rgba(0, 0, 0, 0.05) !important;
@@ -331,22 +346,10 @@ if df is not None:
                 background: #e5e3df;
             }}
 
-            /* ========================================================= */
-            /* TRUY VẤN VÀ ẨN TRIỆT ĐỂ TẤT CẢ BIỂU TƯỢNG VÀ NÚT Ở GÓC DƯỚI BÊN PHẢI */
-            /* ========================================================= */
-            .leaflet-bottom.leaflet-right,
-            .leaflet-control-attribution,
-            .leaflet-control-layers,
-            .leaflet-control-layers-toggle,
-            .leaflet-control-layers-expanded,
-            div[class*="leaflet-bottom"][class*="leaflet-right"],
-            div[class*="leaflet-control-layers"] {{
+            /* ẨN TOÀN BỘ CÁC BIỂU TƯỢNG VÀ NÚT Ở GÓC DƯỚI BÊN PHẢI BẢN ĐỒ */
+            .leaflet-bottom.leaflet-right {{
                 display: none !important;
                 visibility: hidden !important;
-                opacity: 0 !important;
-                pointer-events: none !important;
-                width: 0 !important;
-                height: 0 !important;
             }}
 
             .user-location-marker {{
@@ -439,7 +442,7 @@ if df is not None:
             document.addEventListener("DOMContentLoaded", function() {{
                 var googleStreets = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}', {{
                     maxZoom: 20,
-                    attribution: ''
+                    attribution: 'Google Maps'
                 }});
 
                 var map = L.map('map', {{
