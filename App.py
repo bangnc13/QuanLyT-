@@ -308,71 +308,6 @@ with st.sidebar:
     
     st.markdown("<div class='hud-label'>📡 Trạng thái định vị GPS REALTIME:</div>", unsafe_allow_html=True)
     
-    # Nút bấm HTML/JS kích hoạt định vị GPS qua postMessage
-    components.html("""
-    <style>
-        .gps-btn {
-            font-family: 'Orbitron', sans-serif;
-            font-weight: 700;
-            color: #00f0ff;
-            background: rgba(0, 240, 255, 0.1);
-            border: 1px solid #00f0ff;
-            border-radius: 4px;
-            padding: 8px 12px;
-            width: 100%;
-            cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.3s ease;
-            box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
-            margin-top: 5px;
-        }
-        .gps-btn:hover {
-            background: #00f0ff;
-            color: #000000;
-            box-shadow: 0 0 20px #00f0ff;
-        }
-    </style>
-    <button class="gps-btn" onclick="getLocation()">📍 LẤY VỊ TRÍ GPS HIỆN TẠI</button>
-
-    <script>
-    function getLocation() {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
-                    
-                    window.parent.postMessage({
-                        type: 'UPDATE_GPS_LOCATION',
-                        lat: lat,
-                        lon: lon
-                    }, '*');
-                },
-                (error) => {
-                    let msg = "Không thể lấy tọa độ GPS!";
-                    if (error.code === error.PERMISSION_DENIED) {
-                        msg = "Bạn đã từ chối quyền truy cập GPS trên trình duyệt/điện thoại.";
-                    } else if (error.code === error.POSITION_UNAVAILABLE) {
-                        msg = "Tín hiệu GPS không khả dụng.";
-                    } else if (error.code === error.TIMEOUT) {
-                        msg = "Hết thời gian chờ phản hồi GPS.";
-                    }
-                    alert(msg);
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0
-                }
-            );
-        } else {
-            alert("Trình duyệt không hỗ trợ Geolocation.");
-        }
-    }
-    </script>
-    """, height=55)
-
     if st.session_state.current_loc:
         lat, lon = st.session_state.current_loc
         st.markdown(f"""
@@ -382,7 +317,7 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
     else:
-        st.info("Nhấn nút trên để lấy tọa độ hoặc chờ kết nối GPS...")
+        st.info("Nhấn nút GPS trên bản đồ để cập nhật tọa độ...")
 
     st.divider()
 
@@ -522,6 +457,79 @@ if st.session_state.route_coords:
         opacity=0.9,
         tooltip="Cyber Round-Trip Route"
     ).add_to(m)
+
+# ================= ĐẬP NÚT FLOATING ACTION BUTTON GPS TRỰC TIẾP LÊN MAP =================
+gps_button_element = folium.Element("""
+<style>
+    .leaflet-gps-fab {
+        position: absolute;
+        bottom: 30px;
+        right: 20px;
+        z-index: 9999;
+        width: 52px;
+        height: 52px;
+        background: rgba(31, 12, 0, 0.9);
+        border: 2px solid #00f0ff;
+        border-radius: 50%;
+        color: #00f0ff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 0 15px rgba(0, 240, 255, 0.5), inset 0 0 10px rgba(0, 240, 255, 0.2);
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .leaflet-gps-fab:hover {
+        transform: scale(1.15) rotate(90deg);
+        background: #00f0ff;
+        color: #000000;
+        box-shadow: 0 0 25px #00f0ff, 0 0 40px #00f0ff;
+    }
+    .leaflet-gps-fab:active {
+        transform: scale(0.95);
+    }
+</style>
+
+<div class="leaflet-gps-fab" id="map-gps-btn" title="Cập nhật vị trí GPS hiện tại">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M12 2v3m0 14v3M2 12h3m14 0h3"></path>
+    </svg>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var gpsBtn = document.getElementById('map-gps-btn');
+        if (gpsBtn) {
+            gpsBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            const lat = position.coords.latitude;
+                            const lon = position.coords.longitude;
+                            
+                            // Gửi tọa độ lên cửa sổ mẹ Streamlit
+                            window.parent.postMessage({
+                                type: 'UPDATE_GPS_LOCATION',
+                                lat: lat,
+                                lon: lon
+                            }, '*');
+                        },
+                        (error) => {
+                            alert("Lỗi truy cập GPS! Vui lòng bật định vị trên thiết bị.");
+                        },
+                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                    );
+                } else {
+                    alert("Trình duyệt không hỗ trợ Geolocation.");
+                }
+            });
+        }
+    });
+</script>
+""")
+m.get_root().html.add_child(gps_button_element)
 
 # Tự động bắt sự kiện Click/Touch trên bản đồ để đóng Sidebar
 map_click_js = folium.Element("""
