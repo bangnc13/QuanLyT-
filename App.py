@@ -11,26 +11,37 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen, Sidebar & Nút bấm Toggle xanh Neon
+# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt & Nút bấm Toggle xanh Neon
 st.markdown("""
     <style>
+        /* 1. Thiết lập tràn màn hình tuyệt đối */
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
             margin: 0 !important;
             padding: 0 !important;
             height: 100vh !important;
             overflow: hidden !important;
+            background-color: transparent !important;
         }
 
+        /* 2. LÀM TRONG SUỐT SIDEBAR (MENU) */
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
+            background-color: rgba(255, 255, 255, 0.4) !important; /* Độ trong suốt 40% */
+            backdrop-filter: blur(12px) !important; /* Hiệu ứng làm mờ kính giúp dễ đọc chữ */
+            -webkit-backdrop-filter: blur(12px) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.3) !important; /* Viền mờ tinh tế */
+            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.05) !important;
         }
+
+        /* Điều chỉnh container bên trong Sidebar */
         section[data-testid="stSidebar"] > div:first-child {
+            background: transparent !important;
             padding-top: 1.5rem !important;
             padding-left: 1rem !important;
             padding-right: 1rem !important;
         }
 
-        /* BO TRÒN VÀ MÀU XANH NEON CHO NÚT MỞ/ẨN SIDEBAR CỦA STREAMLIT */
+        /* 3. BO TRÒN VÀ MÀU XANH NEON CHO NÚT MỞ/ẨN SIDEBAR CỦA STREAMLIT */
         [data-testid="stSidebarCollapseButton"], 
         [data-testid="stSidebarNavItems"] button,
         button[aria-label="Close sidebar"],
@@ -51,13 +62,14 @@ st.markdown("""
         .sidebar-title {
             font-size: 1.15rem !important;
             font-weight: 700 !important;
-            color: #1F2937 !important;
+            color: #111827 !important;
             margin-bottom: 2px !important;
         }
         .sidebar-subtitle {
             font-size: 0.8rem !important;
-            color: #6B7280 !important;
+            color: #374151 !important;
             margin-bottom: 12px !important;
+            font-weight: 500 !important;
         }
 
         header[data-testid="stHeader"] {
@@ -190,7 +202,7 @@ if df is not None:
     if len(selected_data) > 0:
         map_center = [selected_data[0]["lat"], selected_data[0]["lng"]]
 
-    # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình + ZOOM MÁY TÍNH
+    # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -252,7 +264,6 @@ if df is not None:
                 box-shadow: 0 2px 6px rgba(0,0,0,0.4);
             }}
 
-            /* ĐIỀU CHỈNH VỊ TRÍ VÀ KIỂU DÁNG 3 NÚT CẠNH NHAU */
             .leaflet-top.leaflet-left {{
                 top: 55px !important;
                 left: 10px !important;
@@ -318,32 +329,14 @@ if df is not None:
                     attribution: 'Google Maps Satellite'
                 }});
 
-                // BẬT CÁC TÍNH NĂNG CUỘN ZOOM (MOUSE WHEEL ZOOM)
                 var map = L.map('map', {{
                     zoomControl: false,
                     attributionControl: false,
-                    scrollWheelZoom: true,     // Cho phép phóng to/thu nhỏ bằng con lăn chuột
-                    smoothWheelZoom: true,     // Cuộn mượt hơn
-                    doubleClickZoom: true,     // Nhấp đôi chuột để zoom
-                    touchZoom: true,           // Zoom cảm ứng trên điện thoại/iPad
-                    boxZoom: true,
                     layers: [googleStreets]
                 }}).setView({json.dumps(map_center)}, 14);
 
-                // Thêm nút Nút Zoom (+/-) ở góc dưới bên trái
                 L.control.zoom({{ position: 'bottomleft' }}).addTo(map);
-
-                // Thêm Bảng Chọn Lớp Bản Đồ
                 L.control.layers({{ "🗺️ Đường phố": googleStreets, "🛰️ Vệ tinh": googleSat }}, null, {{ position: 'bottomright' }}).addTo(map);
-
-                // Thêm thanh thước đo khoảng cách (Scale Bar)
-                L.control.scale({{ metric: true, imperial: false, position: 'bottomright' }}).addTo(map);
-
-                // Giữ tiêu điểm chuột tự động vào map khi di chuyển chuột qua để nhận phím cuộn
-                var mapElement = document.getElementById('map');
-                mapElement.addEventListener('mouseenter', function () {{
-                    mapElement.focus();
-                }});
 
                 var targets = {json.dumps(selected_data)};
                 var markersGroup = L.layerGroup().addTo(map);
@@ -389,7 +382,6 @@ if df is not None:
                         }}).addTo(map);
                     }}
 
-                    // NẾU TRIGGER TỪ SIDEBAR VẪN ĐANG CHỜ -> TỰ ĐỘNG CHẠY KHI ĐÃ CÓ GPS
                     var autoOptimize = {json.dumps(st.session_state.trigger_optimize)};
                     if (autoOptimize && !autoOptimizeTriggered) {{
                         autoOptimizeTriggered = true;
@@ -505,13 +497,11 @@ if df is not None:
                     }}).addTo(map);
                 }}
 
-                // BẢNG ĐIỀU KHIỂN CHỨA 3 NÚT NẰM NGANG VÀ ĐẨY XUỐNG DƯỚI DỄ NHÌN
                 var CustomControls = L.Control.extend({{
                     options: {{ position: 'topleft' }},
                     onAdd: function (map) {{
                         var container = L.DomUtil.create('div', 'custom-btn-container');
 
-                        // Nút 1: GPS của tôi
                         var btnLocate = L.DomUtil.create('div', 'leaflet-control-btn', container);
                         btnLocate.innerHTML = '🎯 GPS của tôi';
                         btnLocate.onclick = function() {{
@@ -522,7 +512,6 @@ if df is not None:
                             }}
                         }};
 
-                        // Nút 2: Tối ưu lộ trình
                         var btnRoute = L.DomUtil.create('div', 'leaflet-control-btn', container);
                         btnRoute.innerHTML = '🚀 Tối ưu lộ trình';
                         btnRoute.style.backgroundColor = '#10B981';
@@ -531,7 +520,6 @@ if df is not None:
                             optimizeAndRoute(false);
                         }};
 
-                        // Nút 3: Bo tròn Màu Xanh Neon Ẩn/Hiện Sidebar
                         var btnToggleSidebar = L.DomUtil.create('div', 'leaflet-control-btn btn-neon', container);
                         btnToggleSidebar.innerHTML = '👁️ Menu';
                         btnToggleSidebar.onclick = function() {{
@@ -549,7 +537,6 @@ if df is not None:
 
                 map.addControl(new CustomControls());
 
-                // Nếu sau 8 giây bắt GPS từ sidebar mà chưa thấy tín hiệu thì mới báo lỗi
                 var autoOptimize = {json.dumps(st.session_state.trigger_optimize)};
                 if (autoOptimize) {{
                     setTimeout(function() {{
