@@ -4,7 +4,7 @@ import requests
 import folium
 import streamlit.components.v1 as components
 
-# 1. Cấu hình trang Full-Width
+# ================= 1. CẤU HÌNH TRANG =================
 st.set_page_config(
     page_title="Hệ Thống Tối Ưu Lộ Trình - Robotic UI",
     page_icon="🤖",
@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Inject CSS Custom UI
+# ================= 2. INJECT CSS CUSTOM UI =================
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
@@ -200,7 +200,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Hàm nạp dữ liệu Excel
+# ================= 3. HÀM NẠP DỮ LIỆU EXCEL =================
 @st.cache_data
 def load_data(file_path):
     try:
@@ -210,7 +210,7 @@ def load_data(file_path):
     except Exception:
         return pd.DataFrame()
 
-# 4. THUẬT TOÁN TỐI ƯU LỘ TRÌNH VÒNG KÍN (ROUND-TRIP: BẮT ĐẦU = KẾT THÚC)
+# ================= 4. THUẬT TOÁN TỐI ƯU LỘ TRÌNH VÒNG KÍN =================
 def get_optimized_route_roundtrip(origin, points_list):
     all_points = [{'Name': 'GPS ORIGIN', 'Latitude': origin[0], 'Longitude': origin[1]}] + points_list
     
@@ -308,7 +308,7 @@ with st.sidebar:
     
     st.markdown("<div class='hud-label'>📡 Trạng thái định vị GPS REALTIME:</div>", unsafe_allow_html=True)
     
-    # Nút bấm HTML/JS kích hoạt định vị GPS chủ động từ thiết bị
+    # Nút bấm HTML/JS kích hoạt định vị GPS qua postMessage
     components.html("""
     <style>
         .gps-btn {
@@ -338,27 +338,40 @@ with st.sidebar:
     <script>
     function getLocation() {
         if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition((position) => {
-                const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
-                const parentWindow = window.parent;
-                const currentUrl = new URL(parentWindow.location.href);
-                currentUrl.searchParams.set('lat', lat);
-                currentUrl.searchParams.set('lon', lon);
-                parentWindow.location.href = currentUrl.toString();
-            }, (error) => {
-                alert("Không thể lấy tọa độ GPS! Hãy cấp quyền vị trí cho trình duyệt.");
-            }, {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            });
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    
+                    window.parent.postMessage({
+                        type: 'UPDATE_GPS_LOCATION',
+                        lat: lat,
+                        lon: lon
+                    }, '*');
+                },
+                (error) => {
+                    let msg = "Không thể lấy tọa độ GPS!";
+                    if (error.code === error.PERMISSION_DENIED) {
+                        msg = "Bạn đã từ chối quyền truy cập GPS trên trình duyệt/điện thoại.";
+                    } else if (error.code === error.POSITION_UNAVAILABLE) {
+                        msg = "Tín hiệu GPS không khả dụng.";
+                    } else if (error.code === error.TIMEOUT) {
+                        msg = "Hết thời gian chờ phản hồi GPS.";
+                    }
+                    alert(msg);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
         } else {
             alert("Trình duyệt không hỗ trợ Geolocation.");
         }
     }
     </script>
-    """, height=50)
+    """, height=55)
 
     if st.session_state.current_loc:
         lat, lon = st.session_state.current_loc
@@ -439,9 +452,8 @@ folium.TileLayer(
     overlay=False
 ).add_to(m)
 
-# 5. HIỂN THỊ MŨI TÊN ĐỊNH HƯỚNG REALTIME QUAY THEO ĐIỆN THOẠI
+# Hiển thị Mũi Tên Định Hướng GPS Realtime
 if st.session_state.current_loc:
-    # Biểu tượng Mũi Tên Navigation Cyber SVG
     arrow_icon_html = """
     <div id="user-heading-arrow" style="
         width: 42px; 
@@ -502,7 +514,7 @@ if st.session_state.route_coords:
         tooltip="Cyber Round-Trip Route"
     ).add_to(m)
 
-# TỰ ĐỘNG BẮT SỰ KIỆN CLICK TRÊN BẢN ĐỒ VÀ BÁO VỀ TRÌNH DUYỆT MẸ ĐỂ THU GỌN SIDEBAR
+# Tự động bắt sự kiện Click/Touch trên bản đồ để đóng Sidebar
 map_click_js = folium.Element("""
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -527,21 +539,33 @@ m.get_root().html.add_child(map_click_js)
 from streamlit_folium import st_folium
 st_folium(m, use_container_width=True, height=1000)
 
-# 6. JAVASCRIPT LẮNG NGHE LA BÀN ĐIỆN THOẠI & GPS REALTIME TRACKING
+# ================= 5. JAVASCRIPT LẮNG NGHE LA BÀN & GPS TRACKING =================
 components.html("""
 <script>
-    // A. THU GỌN SIDEBAR KHI CHẠM VÀO BẢN ĐỒ
+    // A. LẮNG NGHE SỰ KIỆN TỪ IFRAME BÊN TRONG
     window.addEventListener('message', function(event) {
-        if (event.data && event.data.type === 'CLOSE_STREAMLIT_SIDEBAR') {
+        if (!event.data) return;
+
+        // 1. Thu gọn sidebar khi chạm bản đồ
+        if (event.data.type === 'CLOSE_STREAMLIT_SIDEBAR') {
             const parentDoc = window.parent.document;
             const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
             
             if (sidebar && sidebar.getAttribute('aria-expanded') === 'true') {
                 const collapseBtn = parentDoc.querySelector('[data-testid="stSidebarCollapseButton"] button');
-                if (collapseBtn) {
-                    collapseBtn.click();
-                }
+                if (collapseBtn) collapseBtn.click();
             }
+        }
+
+        // 2. Cập nhật tọa độ khi bấm nút "LẤY VỊ TRÍ GPS HIỆN TẠI"
+        if (event.data.type === 'UPDATE_GPS_LOCATION') {
+            const lat = event.data.lat;
+            const lon = event.data.lon;
+            const parentWindow = window.parent;
+            const currentUrl = new URL(parentWindow.location.href);
+            currentUrl.searchParams.set('lat', lat);
+            currentUrl.searchParams.set('lon', lon);
+            parentWindow.location.href = currentUrl.toString();
         }
     });
 
@@ -549,11 +573,9 @@ components.html("""
     function handleOrientation(event) {
         let heading = null;
         if (event.webkitCompassHeading) {
-            // iOS Devices
-            heading = event.webkitCompassHeading;
+            heading = event.webkitCompassHeading; // iOS
         } else if (event.alpha !== null) {
-            // Android Devices
-            heading = 360 - event.alpha;
+            heading = 360 - event.alpha; // Android
         }
 
         if (heading !== null) {
@@ -565,7 +587,6 @@ components.html("""
         }
     }
 
-    // Yêu cầu quyền truy cập Cảm biến trên iOS nếu cần
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission()
             .then(response => {
@@ -579,7 +600,7 @@ components.html("""
         window.addEventListener('deviceorientation', handleOrientation, true);
     }
 
-    // C. REALTIME GPS TRACKING DI CHUYỂN
+    // C. REALTIME GPS TRACKING TỰ ĐỘNG KHI DI CHUYỂN
     let lastLat = null;
     let lastLon = null;
 
@@ -601,7 +622,7 @@ components.html("""
                 }
             },
             (error) => {
-                console.error("Lỗi GPS:", error);
+                console.error("Lỗi GPS Tracking:", error);
             },
             {
                 enableHighAccuracy: true,
