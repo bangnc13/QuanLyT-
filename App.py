@@ -225,7 +225,7 @@ def get_optimized_route_roundtrip(origin, points_list):
     table_url = f"http://router.project-osrm.org/table/v1/driving/{coords_str}?annotations=duration,distance"
     
     try:
-        res = requests.get(table_url, timeout=10).json()
+        res = requests.get(table_url, timeout=5).json()
         if res.get('code') != 'Ok':
             return None, [], 0, 0
             
@@ -257,7 +257,7 @@ def get_optimized_route_roundtrip(origin, points_list):
         route_coords_str += f";{origin[1]},{origin[0]}"
 
         route_url = f"http://router.project-osrm.org/route/v1/driving/{route_coords_str}?overview=full&geometries=geojson"
-        route_res = requests.get(route_url, timeout=10).json()
+        route_res = requests.get(route_url, timeout=5).json()
         
         if route_res.get('code') == 'Ok':
             route_data = route_res['routes'][0]
@@ -290,7 +290,7 @@ if 'ordered_points' not in st.session_state:
 if 'route_summary' not in st.session_state:
     st.session_state.route_summary = None
 
-# Bắt tọa độ Realtime từ URL query params
+# Bắt tọa độ Realtime siêu tốc từ URL query params
 realtime_lat = st.query_params.get("lat")
 realtime_lon = st.query_params.get("lon")
 if realtime_lat and realtime_lon:
@@ -324,7 +324,7 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
     else:
-        st.info("Nhấn nút GPS trên bản đồ để cập nhật tọa độ...")
+        st.info("⚡ GPS đang kết nối Siêu Tốc...")
 
     st.divider()
 
@@ -412,7 +412,7 @@ if st.session_state.current_loc:
         display: flex; 
         justify-content: center; 
         align-items: center; 
-        transition: transform 0.15s ease-out; 
+        transition: transform 0.1s linear; 
         transform-origin: center center;
     ">
         <svg width="42" height="42" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 0px 8px #00f0ff);">
@@ -465,13 +465,13 @@ if st.session_state.route_coords:
         tooltip="Cyber Round-Trip Route"
     ).add_to(m)
 
-# ================= FLOATING ACTION BUTTON GPS Ở CẠNH TRÊN BÊN TRÁI MAP =================
+# ================= FLOATING ACTION BUTTON GPS TỐC ĐỘ CAO (GÓC TRÊN BÊN TRÁI) =================
 gps_button_element = folium.Element("""
 <style>
     .leaflet-gps-fab {
         position: fixed !important;
-        top: 25px !important;       /* Cạnh trên */
-        left: 25px !important;      /* Cạnh trái */
+        top: 25px !important;
+        left: 25px !important;
         z-index: 999999 !important;
         width: 48px;
         height: 48px;
@@ -484,17 +484,17 @@ gps_button_element = folium.Element("""
         justify-content: center;
         cursor: pointer;
         box-shadow: 0 0 15px rgba(0, 240, 255, 0.7), inset 0 0 10px rgba(0, 240, 255, 0.3);
-        transition: all 0.3s ease;
+        transition: all 0.2s ease;
     }
     .leaflet-gps-fab:hover {
-        transform: scale(1.15) rotate(90deg);
+        transform: scale(1.15);
         background: #00f0ff;
         color: #000000;
         box-shadow: 0 0 25px #00f0ff;
     }
 </style>
 
-<div class="leaflet-gps-fab" id="map-gps-btn" title="Cập nhật vị trí GPS">
+<div class="leaflet-gps-fab" id="map-gps-btn" title="Cập nhật vị trí GPS Siêu Tốc">
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"></circle>
         <path d="M12 2v3m0 14v3M2 12h3m14 0h3"></path>
@@ -502,31 +502,30 @@ gps_button_element = folium.Element("""
 </div>
 
 <script>
-    (function initGpsBtn() {
+    (function initGpsBtnFast() {
         var gpsBtn = document.getElementById('map-gps-btn');
         if (gpsBtn) {
             gpsBtn.onclick = function(e) {
                 e.stopPropagation();
                 if (navigator.geolocation) {
+                    // Ưu tiên dùng dữ liệu Fast-Cache từ thiết bị
                     navigator.geolocation.getCurrentPosition(
                         function(position) {
                             window.parent.postMessage({
-                                type: 'UPDATE_GPS_LOCATION',
+                                type: 'FAST_GPS_UPDATE',
                                 lat: position.coords.latitude,
                                 lon: position.coords.longitude
                             }, '*');
                         },
                         function(error) {
-                            alert("Vui lòng bật quyền truy cập GPS trên thiết bị/trình duyệt!");
+                            alert("Vui lòng bật GPS trên thiết bị!");
                         },
-                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                        { enableHighAccuracy: true, timeout: 3000, maximumAge: 5000 }
                     );
-                } else {
-                    alert("Trình duyệt không hỗ trợ Geolocation.");
                 }
             };
         } else {
-            setTimeout(initGpsBtn, 100);
+            setTimeout(initGpsBtnFast, 50);
         }
     })();
 </script>
@@ -557,38 +556,44 @@ m.get_root().html.add_child(map_click_js)
 
 st_folium(m, use_container_width=True, height=1000)
 
-# ================= 5. JAVASCRIPT LẮNG NGHE LA BÀN & GPS TRACKING =================
+# ================= 5. JAVASCRIPT ĐỊNH VỊ REALTIME VÀ LA BÀN TỐC ĐỘ CAO =================
 components.html("""
 <script>
-    // A. LẮNG NGHE SỰ KIỆN TỪ IFRAME BÊN TRONG
+    // A. LẮNG NGHE SỰ KIỆN VÀ CẬP NHẬT TỨC THÌ
     window.addEventListener('message', function(event) {
         if (!event.data) return;
 
-        // 1. Thu gọn sidebar khi chạm bản đồ
+        // 1. Thu gọn sidebar
         if (event.data.type === 'CLOSE_STREAMLIT_SIDEBAR') {
             const parentDoc = window.parent.document;
             const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
-            
             if (sidebar && sidebar.getAttribute('aria-expanded') === 'true') {
                 const collapseBtn = parentDoc.querySelector('[data-testid="stSidebarCollapseButton"] button');
                 if (collapseBtn) collapseBtn.click();
             }
         }
 
-        // 2. Cập nhật tọa độ khi bấm nút "LẤY VỊ TRÍ GPS HIỆN TẠI"
-        if (event.data.type === 'UPDATE_GPS_LOCATION') {
+        // 2. Cập nhật GPS Siêu Tốc (Fast GPS Update)
+        if (event.data.type === 'FAST_GPS_UPDATE') {
             const lat = event.data.lat;
             const lon = event.data.lon;
             const parentWindow = window.parent;
             const currentUrl = new URL(parentWindow.location.href);
-            currentUrl.searchParams.set('lat', lat);
-            currentUrl.searchParams.set('lon', lon);
-            parentWindow.location.href = currentUrl.toString();
+            
+            // So sánh nếu tọa độ mới khác đáng kể mới reload lại state
+            const oldLat = currentUrl.searchParams.get('lat');
+            const oldLon = currentUrl.searchParams.get('lon');
+            
+            if (!oldLat || Math.abs(parseFloat(oldLat) - lat) > 0.00002 || Math.abs(parseFloat(oldLon) - lon) > 0.00002) {
+                currentUrl.searchParams.set('lat', lat);
+                currentUrl.searchParams.set('lon', lon);
+                parentWindow.location.href = currentUrl.toString();
+            }
         }
     });
 
-    // B. LẤY HƯỚNG XOAY LA BÀN TỪ ĐIỆN THOẠI (COMPASS HEADING)
-    function handleOrientation(event) {
+    // B. MŨI TÊN XOAY THEO LA BÀN REALTIME (Xử lý tần số cao 60FPS)
+    function handleOrientationFast(event) {
         let heading = null;
         if (event.webkitCompassHeading) {
             heading = event.webkitCompassHeading; // iOS
@@ -605,30 +610,48 @@ components.html("""
         }
     }
 
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        DeviceOrientationEvent.requestPermission()
-            .then(response => {
+    if (window.DeviceOrientationEvent) {
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+            DeviceOrientationEvent.requestPermission().then(response => {
                 if (response === 'granted') {
-                    window.addEventListener('deviceorientation', handleOrientation, true);
+                    window.addEventListener('deviceorientation', handleOrientationFast, true);
                 }
-            })
-            .catch(console.error);
-    } else {
-        window.addEventListener('deviceorientation absolute', handleOrientation, true);
-        window.addEventListener('deviceorientation', handleOrientation, true);
+            });
+        } else {
+            window.addEventListener('deviceorientationabsolute', handleOrientationFast, true);
+            window.addEventListener('deviceorientation', handleOrientationFast, true);
+        }
     }
 
-    // C. REALTIME GPS TRACKING TỰ ĐỘNG KHI DI CHUYỂN
+    // C. TỰ ĐỘNG BẮT GPS NGAY LẬP TỨC KHI MỞ TRANG (AUTO FAST LOAD)
     let lastLat = null;
     let lastLon = null;
 
     if ("geolocation" in navigator) {
+        // Lấy ngay vị trí từ Cache thiết bị khi vừa mở web
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                const parentWindow = window.parent;
+                const currentUrl = new URL(parentWindow.location.href);
+                if (!currentUrl.searchParams.get('lat')) {
+                    currentUrl.searchParams.set('lat', lat);
+                    currentUrl.searchParams.set('lon', lon);
+                    parentWindow.location.href = currentUrl.toString();
+                }
+            },
+            (err) => {},
+            { enableHighAccuracy: false, maximumAge: 60000, timeout: 2000 }
+        );
+
+        # Theo dõi vị trí liên tục tần số cao
         navigator.geolocation.watchPosition(
             (position) => {
                 const lat = position.coords.latitude;
                 const lon = position.coords.longitude;
                 
-                if (!lastLat || Math.abs(lat - lastLat) > 0.00004 || Math.abs(lon - lastLon) > 0.00004) {
+                if (!lastLat || Math.abs(lat - lastLat) > 0.00003 || Math.abs(lon - lastLon) > 0.00003) {
                     lastLat = lat;
                     lastLon = lon;
                     
@@ -639,13 +662,11 @@ components.html("""
                     parentWindow.history.replaceState({}, '', currentUrl);
                 }
             },
-            (error) => {
-                console.error("Lỗi GPS Tracking:", error);
-            },
+            (error) => {},
             {
                 enableHighAccuracy: true,
-                maximumAge: 1000,
-                timeout: 5000
+                maximumAge: 2000,
+                timeout: 3000
             }
         );
     }
