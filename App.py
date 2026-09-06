@@ -11,34 +11,10 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# CSS Tùy chỉnh ẩn sạch giao diện Streamlit Cloud & Styling Sidebar
+# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Trong Suốt & Nút bấm Toggle xanh Neon
 st.markdown(
     """
     <style>
-        /* ========================================================= */
-        /* 0. ẨN TRIỆT ĐỂ THANH TRÊN, FOOTER VÀ BADGE CỦA STREAMLIT */
-        /* ========================================================= */
-        header, footer, #MainMenu, [data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"] {
-            display: none !important;
-            visibility: hidden !important;
-            height: 0px !important;
-        }
-
-        /* Ẩn các badge, viewerBadge, watermark cố định ở các góc */
-        .viewerBadge_container__163Vn,
-        .styles_viewerBadge__1yB5_,
-        [data-testid="stStatusWidget"],
-        [data-testid="stConnectionStatus"],
-        div[class*="viewerBadge"],
-        div[class*="styles_viewerBadge"],
-        div[class*="stAppDeployButton"],
-        a[href*="streamlit.io"] {
-            display: none !important;
-            opacity: 0 !important;
-            visibility: hidden !important;
-            pointer-events: none !important;
-        }
-
         /* 1. Thiết lập tràn màn hình tuyệt đối */
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
             margin: 0 !important;
@@ -48,16 +24,17 @@ st.markdown(
             background-color: transparent !important;
         }
 
-        /* 2. LÀM TRONG SUỐT VÀ MỜ KÍNH CHO SIDEBAR */
+        /* 2. LÀM TRONG SUỐT VÀ MỜ KÍNH CHO SIDEBAR (MENU) */
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
-            background-color: rgba(255, 255, 255, 0.4) !important;
-            backdrop-filter: blur(12px) !important;
+            background-color: rgba(255, 255, 255, 0.4) !important; /* Độ trong suốt 40% */
+            backdrop-filter: blur(12px) !important; /* Hiệu ứng làm mờ kính */
             -webkit-backdrop-filter: blur(12px) !important;
             border-right: 1px solid rgba(255, 255, 255, 0.3) !important;
             box-shadow: 4px 0 15px rgba(0, 0, 0, 0.05) !important;
         }
 
+        /* Điều chỉnh container bên trong Sidebar */
         section[data-testid="stSidebar"] > div:first-child {
             background: transparent !important;
             padding-top: 1rem !important;
@@ -83,7 +60,7 @@ st.markdown(
             object-fit: contain !important;
         }
 
-        /* 4. BO TRÒN VÀ MÀU XANH NEON CHO NÚT MỞ/ẨN SIDEBAR */
+        /* 4. BO TRÒN VÀ MÀU XANH NEON CHO NÚT MỞ/ẨN SIDEBAR CỦA STREAMLIT */
         [data-testid="stSidebarCollapseButton"], 
         [data-testid="stSidebarNavItems"] button,
         button[aria-label="Close sidebar"],
@@ -112,6 +89,12 @@ st.markdown(
             color: #374151 !important;
             margin-bottom: 12px !important;
             font-weight: 500 !important;
+        }
+
+        header[data-testid="stHeader"] {
+            background: transparent !important;
+            height: 0px !important;
+            z-index: 999999 !important;
         }
 
         .main .block-container, 
@@ -172,7 +155,9 @@ def load_excel_data():
 
 df, file_name = load_excel_data()
 
+# -------------------------------------------------------------
 # LOGO VÀO TRÊN CÙNG SIDEBAR CÓ NỀN TRONG SUỐT
+# -------------------------------------------------------------
 if os.path.exists("FPT_Telecom_logo.png"):
     st.sidebar.image("FPT_Telecom_logo.png", use_container_width=True)
 else:
@@ -182,16 +167,19 @@ st.sidebar.markdown(
     '<div class="sidebar-title"></div>', unsafe_allow_html=True
 )
 st.sidebar.markdown(
-    '<div class="sidebar-subtitle"> Make by BangNC13 </div>',
+    '<div class="sidebar-subtitle"> Make by'
+    " BangNC13 </div>",
     unsafe_allow_html=True,
 )
 
+# Khởi tạo session state kích hoạt tối ưu từ sidebar
 if "trigger_optimize" not in st.session_state:
     st.session_state.trigger_optimize = False
 
 if df is not None:
     df.columns = [str(col).strip() for col in df.columns]
 
+    # Tìm tự động các cột Tên điểm, Vĩ độ (Lat), Kinh độ (Lng)
     name_col = next(
         (
             c
@@ -276,6 +264,10 @@ if df is not None:
             if len(all_point_names) >= 5
             else all_point_names
         ),
+        help=(
+            "Thứ tự tối ưu sẽ được tự động tính toán dựa theo vị trí GPS xuất"
+            " phát của bạn."
+        ),
     )
 
     selected_data = []
@@ -288,6 +280,7 @@ if df is not None:
 
     st.sidebar.info(f"Đã chọn **{len(selected_data)}** tập điểm.")
 
+    # 🔘 NÚT TỐI ƯU LỘ TRÌNH TRÊN SIDEBAR
     if st.sidebar.button(
         "🚀 Tối ưu lộ trình di chuyển", type="primary", use_container_width=True
     ):
@@ -297,7 +290,7 @@ if df is not None:
     if len(selected_data) > 0:
         map_center = [selected_data[0]["lat"], selected_data[0]["lng"]]
 
-    # Giao diện Leaflet JS + Ép ẩn toàn bộ Watermark/Badge ở cấp độ JS DOM
+    # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -305,9 +298,11 @@ if df is not None:
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         
+        <!-- Leaflet CSS & JS -->
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+        <!-- Leaflet Routing Machine CSS & JS -->
         <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
         <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
@@ -324,22 +319,6 @@ if df is not None:
                 height: 100vh;
                 background: #e5e3df;
             }}
-
-            /* ÉP ẨN TRIỆT ĐỂ TOÀN BỘ CÁC BẢNG LOGO, WATERMARK, BADGE Ở GÓC DƯỚI BÊN PHẢI VÀ TOÀN MÀN HÌNH */
-            .leaflet-control-attribution,
-            .leaflet-bottom.leaflet-right,
-            .leaflet-bottom,
-            a[href*="streamlit"],
-            a[href*="leaflet"],
-            a[href*="mapbox"],
-            div[class*="viewerBadge"],
-            div[class*="styles_viewerBadge"] {{
-                display: none !important;
-                visibility: hidden !important;
-                opacity: 0 !important;
-                pointer-events: none !important;
-            }}
-
             .user-location-marker {{
                 background-color: #2563EB;
                 border: 3px solid #FFFFFF;
@@ -374,7 +353,7 @@ if df is not None:
             }}
 
             .leaflet-top.leaflet-left {{
-                top: 15px !important;
+                top: 55px !important;
                 left: 10px !important;
             }}
 
@@ -430,7 +409,12 @@ if df is not None:
             document.addEventListener("DOMContentLoaded", function() {{
                 var googleStreets = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}', {{
                     maxZoom: 20,
-                    attribution: ''
+                    attribution: 'Google Maps'
+                }});
+
+                var googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s,h&x={{x}}&y={{y}}&z={{z}}', {{
+                    maxZoom: 20,
+                    attribution: 'Google Maps Satellite'
                 }});
 
                 var map = L.map('map', {{
@@ -440,23 +424,7 @@ if df is not None:
                 }}).setView({json.dumps(map_center)}, 14);
 
                 L.control.zoom({{ position: 'bottomleft' }}).addTo(map);
-
-                // DỌN SẠCH CÁC ICON VÀ BADGE NGOÀI BẰNG JAVASCRIPT TRUY CẬP PARENT DOM
-                function purgeExternalBadges() {{
-                    try {{
-                        var parentDoc = window.parent.document;
-                        var badges = parentDoc.querySelectorAll('a[href*="streamlit.io"], div[class*="viewerBadge"], [data-testid="stStatusWidget"]');
-                        badges.forEach(function(el) {{
-                            el.style.display = 'none';
-                            el.style.opacity = '0';
-                            el.style.visibility = 'hidden';
-                        }});
-                    }} catch(e) {{
-                        console.log(e);
-                    }}
-                }}
-                
-                setInterval(purgeExternalBadges, 500);
+                L.control.layers({{ "🗺️ Đường phố": googleStreets, "🛰️ Vệ tinh": googleSat }}, null, {{ position: 'bottomright' }}).addTo(map);
 
                 var targets = {json.dumps(selected_data)};
                 var markersGroup = L.layerGroup().addTo(map);
@@ -477,6 +445,7 @@ if df is not None:
                 }}
                 renderInitialMarkers();
 
+                // Định vị GPS
                 var userLatLng = null;
                 var userMarker = null;
                 var accuracyCircle = null;
@@ -622,7 +591,7 @@ if df is not None:
                         var container = L.DomUtil.create('div', 'custom-btn-container');
 
                         var btnLocate = L.DomUtil.create('div', 'leaflet-control-btn', container);
-                        btnLocate.innerHTML = '🎯 GPS của tôi';
+                        btnLocate.innerHTML = '🎯 GPS';
                         btnLocate.onclick = function() {{
                             if (userLatLng) {{
                                 map.setView(userLatLng, 17);
