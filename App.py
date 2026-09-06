@@ -109,7 +109,7 @@ def load_excel_data():
         "Danh-Sách-Đoạn-Cáp.xlsx",  
         "data.xlsx" 
     ] 
-    
+
     selected_file = None 
     for f in possible_files: 
         if os.path.exists(f): 
@@ -128,6 +128,11 @@ def load_excel_data():
 
 df, file_name = load_excel_data() 
 
+# --- HIỂN THỊ LOGO Ở ĐẦU SIDEBAR ---
+logo_path = "FPT_Telecom_logo.png"
+if os.path.exists(logo_path):
+    st.sidebar.image(logo_path, use_container_width=True)
+
 st.sidebar.markdown('<div class="sidebar-title">Tối Ưu Lộ Trình</div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="sidebar-subtitle">Tối ưu quãng đường thu cước - Make by BangNC13 </div>', unsafe_allow_html=True)
 
@@ -137,7 +142,7 @@ if "trigger_optimize" not in st.session_state:
 
 if df is not None: 
     df.columns = [str(col).strip() for col in df.columns] 
-    
+
     # Tìm tự động các cột Tên điểm, Vĩ độ (Lat), Kinh độ (Lng)
     name_col = next((c for c in df.columns if any(k in c.lower() for k in ['tên', 'điểm', 'kn', 'station', 'name'])), df.columns[0])
     lat_col = next((c for c in df.columns if any(k in c.lower() for k in ['lat', 'vĩ độ', 'vi do'])), None) 
@@ -159,7 +164,7 @@ if df is not None:
         lat_col1 = next((c for c in df.columns if 'lat' in c.lower() and '1' in c.lower()), None) 
         lon_col1 = next((c for c in df.columns if ('lng' in c.lower() or 'lon' in c.lower()) and '1' in c.lower()), None)
         k1_col = next((c for c in df.columns if 'kn1' in c.lower() or 'điểm 1' in c.lower()), name_col)
-        
+
         if lat_col1 and lon_col1:
             for _, row in df.iterrows():
                 p_name = str(row[k1_col]).strip()
@@ -173,10 +178,10 @@ if df is not None:
                     pass
 
     all_point_names = sorted(list(points_dict.keys()))
-    
+
     st.sidebar.markdown("---")
     st.sidebar.subheader("📍 CHỌN CÁC TẬP ĐIỂM CẦN ĐẾN")
-    
+
     selected_points = st.sidebar.multiselect(
         "Chọn các điểm cần đi qua:",
         options=all_point_names,
@@ -209,7 +214,7 @@ if df is not None:
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        
+
         <!-- Leaflet CSS & JS -->
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -472,7 +477,7 @@ if df is not None:
 
                         var m = L.marker([pt.lat, pt.lng], {{ icon: numIcon }});
                         var popupMsg = idx === 0 ? "<b>Điểm Xuất Phát (GPS)</b>" : "<b>Thứ tự " + idx + ":</b> " + pt.name;
-                        
+
                         m.bindPopup(popupMsg);
                         markersGroup.addLayer(m);
                     }});
