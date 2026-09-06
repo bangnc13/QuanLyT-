@@ -254,13 +254,13 @@ if df is not None:
 
             /* ĐIỀU CHỈNH VỊ TRÍ VÀ KIỂU DÁNG 3 NÚT CẠNH NHAU */
             .leaflet-top.leaflet-left {{
-                top: 55px !important; /* Đẩy cụm nút xuống dưới 1 chút */
+                top: 55px !important;
                 left: 10px !important;
             }}
 
             .custom-btn-container {{
                 display: flex !important;
-                flex-direction: row !important; /* Đặt 3 nút trên 1 hàng ngang */
+                flex-direction: row !important;
                 gap: 8px !important;
                 background: transparent !important;
                 border: none !important;
@@ -270,7 +270,7 @@ if df is not None:
             .leaflet-control-btn {{
                 background-color: #ffffff;
                 border: 2px solid rgba(0,0,0,0.15);
-                border-radius: 20px; /* Bo tròn viền nút */
+                border-radius: 20px;
                 padding: 7px 14px;
                 cursor: pointer;
                 font-size: 13px;
@@ -288,7 +288,6 @@ if df is not None:
                 box-shadow: 0 5px 12px rgba(0,0,0,0.35);
             }}
 
-            /* Style nút Xanh Neon */
             .btn-neon {{
                 background-color: #00FF66 !important;
                 color: #000000 !important;
@@ -351,6 +350,7 @@ if df is not None:
                 var userLatLng = null;
                 var userMarker = null;
                 var accuracyCircle = null;
+                var autoOptimizeTriggered = false;
 
                 function onLocationFound(e) {{
                     userLatLng = e.latlng;
@@ -369,6 +369,13 @@ if df is not None:
                             fillOpacity: 0.15,
                             weight: 1
                         }}).addTo(map);
+                    }}
+
+                    // NẾU TRIGGER TỪ SIDEBAR VẪN ĐANG CHỜ -> TỰ ĐỘNG CHẠY KHI ĐÃ CÓ GPS
+                    var autoOptimize = {json.dumps(st.session_state.trigger_optimize)};
+                    if (autoOptimize && !autoOptimizeTriggered) {{
+                        autoOptimizeTriggered = true;
+                        optimizeAndRoute(true);
                     }}
                 }}
 
@@ -417,9 +424,11 @@ if df is not None:
 
                 var routingControl = null;
 
-                function optimizeAndRoute() {{
+                function optimizeAndRoute(isAuto) {{
                     if (!userLatLng) {{
-                        alert("Đang bắt tín hiệu GPS... Vui lòng bật quyền vị trí trên trình duyệt và thử lại.");
+                        if (!isAuto) {{
+                            alert("Đang bắt tín hiệu GPS... Vui lòng bật quyền vị trí trên trình duyệt và thử lại.");
+                        }}
                         return;
                     }}
 
@@ -495,13 +504,13 @@ if df is not None:
                             }}
                         }};
 
-                        // Nút 2: Tối ưu lộ trình (Đổi sang màu xanh lá mạ đốm)
+                        // Nút 2: Tối ưu lộ trình
                         var btnRoute = L.DomUtil.create('div', 'leaflet-control-btn', container);
                         btnRoute.innerHTML = '🚀 Tối ưu lộ trình';
                         btnRoute.style.backgroundColor = '#10B981';
                         btnRoute.style.color = '#FFFFFF';
                         btnRoute.onclick = function() {{
-                            optimizeAndRoute();
+                            optimizeAndRoute(false);
                         }};
 
                         // Nút 3: Bo tròn Màu Xanh Neon Ẩn/Hiện Sidebar
@@ -522,11 +531,14 @@ if df is not None:
 
                 map.addControl(new CustomControls());
 
+                // Nếu sau 8 giây bắt GPS từ sidebar mà chưa thấy tín hiệu thì mới báo lỗi
                 var autoOptimize = {json.dumps(st.session_state.trigger_optimize)};
                 if (autoOptimize) {{
                     setTimeout(function() {{
-                        optimizeAndRoute();
-                    }}, 800);
+                        if (!autoOptimizeTriggered && !userLatLng) {{
+                            alert("Đang bắt tín hiệu GPS... Vui lòng kiểm tra quyền truy cập vị trí trên trình duyệt và thử lại.");
+                        }}
+                    }}, 8000);
                 }}
             }});
         </script>
