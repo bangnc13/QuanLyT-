@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import folium
 import streamlit.components.v1 as components
+from streamlit_folium import st_folium
 
 # ================= 1. CẤU HÌNH TRANG =================
 st.set_page_config(
@@ -536,7 +537,6 @@ map_click_js = folium.Element("""
 """)
 m.get_root().html.add_child(map_click_js)
 
-from streamlit_folium import st_folium
 st_folium(m, use_container_width=True, height=1000)
 
 # ================= 5. JAVASCRIPT LẮNG NGHE LA BÀN & GPS TRACKING =================
