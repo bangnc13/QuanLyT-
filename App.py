@@ -15,7 +15,40 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+        /* ========================================================= */
+        /* 0. ẨN TẤT CẢ ICON THANH TRÊN, FOOTER VÀ WATERMARK/BADGE CỦA STREAMLIT */
+        /* ========================================================= */
+        header[data-testid="stHeader"],
+        [data-testid="stHeader"],
+        [data-testid="stToolbar"],
+        [data-testid="stDecoration"],
+        footer,
+        #MainMenu,
+        .viewerBadge_container__163Vn,
+        .styles_viewerBadge__1yB5_,
+        [data-testid="stStatusWidget"],
+        [data-testid="stConnectionStatus"],
+        .stAppViewBlockContainer iframe,
+        div[class*="viewerBadge"],
+        div[class*="styles_viewerBadge"],
+        a[href*="streamlit.io"] {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            height: 0px !important;
+            width: 0px !important;
+            pointer-events: none !important;
+        }
+
+        /* Ẩn triệt để các phần tử cố định ở góc dưới màn hình */
+        div[style*="position: fixed"][style*="bottom"],
+        div[style*="position: absolute"][style*="bottom"] {
+            z-index: -999999 !important;
+        }
+
+        /* ========================================================= */
         /* 1. Thiết lập tràn màn hình tuyệt đối */
+        /* ========================================================= */
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
             margin: 0 !important;
             padding: 0 !important;
@@ -27,8 +60,8 @@ st.markdown(
         /* 2. LÀM TRONG SUỐT VÀ MỜ KÍNH CHO SIDEBAR (MENU) */
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
-            background-color: rgba(255, 255, 255, 0.4) !important; /* Độ trong suốt 40% */
-            backdrop-filter: blur(12px) !important; /* Hiệu ứng làm mờ kính */
+            background-color: rgba(255, 255, 255, 0.4) !important;
+            backdrop-filter: blur(12px) !important;
             -webkit-backdrop-filter: blur(12px) !important;
             border-right: 1px solid rgba(255, 255, 255, 0.3) !important;
             box-shadow: 4px 0 15px rgba(0, 0, 0, 0.05) !important;
@@ -89,12 +122,6 @@ st.markdown(
             color: #374151 !important;
             margin-bottom: 12px !important;
             font-weight: 500 !important;
-        }
-
-        header[data-testid="stHeader"] {
-            background: transparent !important;
-            height: 0px !important;
-            z-index: 999999 !important;
         }
 
         .main .block-container, 
@@ -167,8 +194,7 @@ st.sidebar.markdown(
     '<div class="sidebar-title"></div>', unsafe_allow_html=True
 )
 st.sidebar.markdown(
-    '<div class="sidebar-subtitle"> Make by'
-    " BangNC13 </div>",
+    '<div class="sidebar-subtitle"> Make by BangNC13 </div>',
     unsafe_allow_html=True,
 )
 
@@ -319,6 +345,13 @@ if df is not None:
                 height: 100vh;
                 background: #e5e3df;
             }}
+
+            /* ẨN TOÀN BỘ CÁC BIỂU TƯỢNG VÀ NÚT Ở GÓC DƯỚI BÊN PHẢI BẢN ĐỒ */
+            .leaflet-bottom.leaflet-right {{
+                display: none !important;
+                visibility: hidden !important;
+            }}
+
             .user-location-marker {{
                 background-color: #2563EB;
                 border: 3px solid #FFFFFF;
@@ -353,7 +386,7 @@ if df is not None:
             }}
 
             .leaflet-top.leaflet-left {{
-                top: 55px !important;
+                top: 15px !important;
                 left: 10px !important;
             }}
 
@@ -412,11 +445,6 @@ if df is not None:
                     attribution: 'Google Maps'
                 }});
 
-                var googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s,h&x={{x}}&y={{y}}&z={{z}}', {{
-                    maxZoom: 20,
-                    attribution: 'Google Maps Satellite'
-                }});
-
                 var map = L.map('map', {{
                     zoomControl: false,
                     attributionControl: false,
@@ -424,7 +452,6 @@ if df is not None:
                 }}).setView({json.dumps(map_center)}, 14);
 
                 L.control.zoom({{ position: 'bottomleft' }}).addTo(map);
-                L.control.layers({{ "🗺️ Đường phố": googleStreets, "🛰️ Vệ tinh": googleSat }}, null, {{ position: 'bottomright' }}).addTo(map);
 
                 var targets = {json.dumps(selected_data)};
                 var markersGroup = L.layerGroup().addTo(map);
