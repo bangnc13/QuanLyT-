@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen & Sidebar
+# CSS Tùy chỉnh giao diện Fullscreen, Sidebar & Nút bấm Toggle xanh Neon
 st.markdown("""
     <style>
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
@@ -28,6 +28,24 @@ st.markdown("""
             padding-top: 1.5rem !important;
             padding-left: 1rem !important;
             padding-right: 1rem !important;
+        }
+
+        /* BO TRÒN VÀ MÀU XANH NEON CHO NÚT MỞ/ẨN SIDEBAR CỦA STREAMLIT */
+        [data-testid="stSidebarCollapseButton"], 
+        [data-testid="stSidebarNavItems"] button,
+        button[aria-label="Close sidebar"],
+        button[aria-label="Open sidebar"] {
+            background-color: #00FF66 !important;
+            color: #000000 !important;
+            border-radius: 20px !important;
+            border: 2px solid #00FF66 !important;
+            box-shadow: 0 0 12px #00FF66, 0 0 20px rgba(0, 255, 102, 0.6) !important;
+            transition: all 0.3s ease !important;
+        }
+        [data-testid="stSidebarCollapseButton"]:hover {
+            background-color: #00CC52 !important;
+            box-shadow: 0 0 18px #00FF66, 0 0 30px rgba(0, 255, 102, 0.9) !important;
+            transform: scale(1.05);
         }
 
         .sidebar-title {
@@ -98,7 +116,7 @@ def load_excel_data():
 
 df, file_name = load_excel_data() 
 
-st.sidebar.markdown('<div class="sidebar-title">TQG - Thu cước </div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="sidebar-title">Tối Ưu Lộ Trình</div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="sidebar-subtitle">Tối ưu quãng đường thu cước - Make by BangNC13 </div>', unsafe_allow_html=True)
 
 # Khởi tạo session state kích hoạt tối ưu từ sidebar
@@ -211,7 +229,6 @@ if df is not None:
                 margin-top: -10px !important;
                 box-shadow: 0 0 10px rgba(37, 99, 235, 0.8);
             }}
-            /* CSS Đánh số thứ tự các điểm trên bản đồ */
             .number-icon {{
                 background-color: #EF4444;
                 color: #FFFFFF;
@@ -234,24 +251,55 @@ if df is not None:
                 line-height: 22px;
                 box-shadow: 0 2px 6px rgba(0,0,0,0.4);
             }}
+
+            /* ĐIỀU CHỈNH VỊ TRÍ VÀ KIỂU DÁNG 3 NÚT CẠNH NHAU */
+            .leaflet-top.leaflet-left {{
+                top: 55px !important; /* Đẩy cụm nút xuống dưới 1 chút */
+                left: 10px !important;
+            }}
+
+            .custom-btn-container {{
+                display: flex !important;
+                flex-direction: row !important; /* Đặt 3 nút trên 1 hàng ngang */
+                gap: 8px !important;
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+            }}
+
             .leaflet-control-btn {{
                 background-color: #ffffff;
-                border: 2px solid rgba(0,0,0,0.2);
-                border-radius: 6px;
-                padding: 6px 12px;
+                border: 2px solid rgba(0,0,0,0.15);
+                border-radius: 20px; /* Bo tròn viền nút */
+                padding: 7px 14px;
                 cursor: pointer;
                 font-size: 13px;
                 font-weight: bold;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                box-shadow: 0 3px 8px rgba(0,0,0,0.25);
                 display: flex;
                 align-items: center;
+                justify-content: center;
                 gap: 6px;
+                white-space: nowrap;
+                transition: all 0.2s ease;
             }}
             .leaflet-control-btn:hover {{
-                background-color: #f4f4f4;
+                transform: translateY(-2px);
+                box-shadow: 0 5px 12px rgba(0,0,0,0.35);
             }}
-            
-            /* Ẩn bảng hướng dẫn chỉ đường */
+
+            /* Style nút Xanh Neon */
+            .btn-neon {{
+                background-color: #00FF66 !important;
+                color: #000000 !important;
+                border: 2px solid #00FF66 !important;
+                box-shadow: 0 0 10px #00FF66, 0 2px 8px rgba(0,0,0,0.2) !important;
+            }}
+            .btn-neon:hover {{
+                background-color: #00CC52 !important;
+                box-shadow: 0 0 15px #00FF66, 0 4px 12px rgba(0,0,0,0.3) !important;
+            }}
+
             .leaflet-routing-container {{
                 display: none !important;
             }}
@@ -283,7 +331,6 @@ if df is not None:
                 var targets = {json.dumps(selected_data)};
                 var markersGroup = L.layerGroup().addTo(map);
 
-                // Vẽ các điểm ban đầu (Không bật nhãn hiển thị thường trực)
                 function renderInitialMarkers() {{
                     markersGroup.clearLayers();
                     targets.forEach(function(pt) {{
@@ -331,7 +378,6 @@ if df is not None:
                 }});
                 map.locate({{ watch: true, setView: false, enableHighAccuracy: true }});
 
-                // Thuật toán Haversine
                 function getDistance(lat1, lon1, lat2, lon2) {{
                     var R = 6371;
                     var dLat = (lat2 - lat1) * Math.PI / 180;
@@ -343,7 +389,6 @@ if df is not None:
                     return R * c;
                 }}
 
-                // Giải bài toán TSP
                 function solveTSP(startPt, pts) {{
                     var unvisited = pts.slice();
                     var route = [startPt];
@@ -366,7 +411,6 @@ if df is not None:
                         unvisited.splice(nearestIdx, 1);
                     }}
 
-                    // Quay về điểm GPS ban đầu
                     route.push(startPt);
                     return route;
                 }}
@@ -387,7 +431,6 @@ if df is not None:
                     var startPoint = {{ name: "Điểm Xuất Phát (GPS)", lat: userLatLng.lat, lng: userLatLng.lng }};
                     var optimizedRoute = solveTSP(startPoint, targets);
 
-                    // Xóa marker cũ và thay bằng Marker có ĐÁNH SỐ THỨ TỰ (Đã loại bỏ chú thích chữ thường trực)
                     markersGroup.clearLayers();
 
                     optimizedRoute.forEach(function(pt, idx) {{
@@ -398,7 +441,7 @@ if df is not None:
                             labelText = '🏁';
                             iconClass = 'start-end-icon';
                         }} else if (idx === optimizedRoute.length - 1) {{
-                            return; // Điểm cuối trùng điểm xuất phát
+                            return;
                         }}
 
                         var numIcon = L.divIcon({{
@@ -411,7 +454,6 @@ if df is not None:
                         var m = L.marker([pt.lat, pt.lng], {{ icon: numIcon }});
                         var popupMsg = idx === 0 ? "<b>Điểm Xuất Phát (GPS)</b>" : "<b>Thứ tự " + idx + ":</b> " + pt.name;
                         
-                        // Chỉ hiển thị Popup khi bấm/click vào điểm, không hiển thị nhãn chữ đè lên màn hình
                         m.bindPopup(popupMsg);
                         markersGroup.addLayer(m);
                     }});
@@ -436,15 +478,13 @@ if df is not None:
                     }}).addTo(map);
                 }}
 
-                // Nút điều khiển nhanh góc trên trái
+                // BẢNG ĐIỀU KHIỂN CHỨA 3 NÚT NẰM NGANG VÀ ĐẨY XUỐNG DƯỚI DỄ NHÌN
                 var CustomControls = L.Control.extend({{
                     options: {{ position: 'topleft' }},
                     onAdd: function (map) {{
-                        var container = L.DomUtil.create('div', 'leaflet-bar');
-                        container.style.display = 'flex';
-                        container.style.flexDirection = 'column';
-                        container.style.gap = '6px';
+                        var container = L.DomUtil.create('div', 'custom-btn-container');
 
+                        // Nút 1: GPS của tôi
                         var btnLocate = L.DomUtil.create('div', 'leaflet-control-btn', container);
                         btnLocate.innerHTML = '🎯 GPS của tôi';
                         btnLocate.onclick = function() {{
@@ -455,12 +495,25 @@ if df is not None:
                             }}
                         }};
 
+                        // Nút 2: Tối ưu lộ trình (Đổi sang màu xanh lá mạ đốm)
                         var btnRoute = L.DomUtil.create('div', 'leaflet-control-btn', container);
-                        btnRoute.innerHTML = '🚀 Tối ưu lộ trình di chuyển';
+                        btnRoute.innerHTML = '🚀 Tối ưu lộ trình';
                         btnRoute.style.backgroundColor = '#10B981';
                         btnRoute.style.color = '#FFFFFF';
                         btnRoute.onclick = function() {{
                             optimizeAndRoute();
+                        }};
+
+                        // Nút 3: Bo tròn Màu Xanh Neon Ẩn/Hiện Sidebar
+                        var btnToggleSidebar = L.DomUtil.create('div', 'leaflet-control-btn btn-neon', container);
+                        btnToggleSidebar.innerHTML = '👁️ Ẩn/Hiện Sidebar';
+                        btnToggleSidebar.onclick = function() {{
+                            var sidebarBtn = window.parent.document.querySelector('[data-testid="stSidebarCollapseButton"] button') ||
+                                             window.parent.document.querySelector('button[aria-label="Close sidebar"]') ||
+                                             window.parent.document.querySelector('button[aria-label="Open sidebar"]');
+                            if (sidebarBtn) {{
+                                sidebarBtn.click();
+                            }}
                         }};
 
                         return container;
@@ -469,7 +522,6 @@ if df is not None:
 
                 map.addControl(new CustomControls());
 
-                // Tự động kích hoạt khi bấm nút trên Sidebar
                 var autoOptimize = {json.dumps(st.session_state.trigger_optimize)};
                 if (autoOptimize) {{
                     setTimeout(function() {{
@@ -484,7 +536,6 @@ if df is not None:
 
     components.html(leaflet_html, height=1000, scrolling=False)
 
-    # Đặt lại trigger sau khi đã render xong
     st.session_state.trigger_optimize = False
 
 else:
