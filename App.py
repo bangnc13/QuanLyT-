@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Trong Suốt & Nút bấm Neon Glow Pulse
+# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Trong Suốt & Nút bấm Neon Glow Pulse trên Sidebar
 st.markdown(
     """
     <style>
@@ -57,7 +57,7 @@ st.markdown(
             background-color: transparent !important;
         }
 
-        /* 2. LÀM TRONG SUỐT VÀ MỜ KÍNH CHO SIDEBAR (MENU) */
+        /* 2. LÀM TRONG SUỐT VÀ MỜ KÍNH CHO SIDEBAR (MENU BÊN TRÁI) */
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
             background-color: rgba(255, 255, 255, 0.4) !important;
@@ -125,47 +125,48 @@ st.markdown(
         }
 
         /* ========================================================= */
-        /* 5. HIỆU ỨNG VIỀN NEON RỰC RỠ TỎA SÁNG CHO NÚT TỐI ƯU SIDEBAR */
+        /* 5. HIỆU ỨNG VIỀN NEON TỎA SÁNG CỰC ĐẸP CHO NÚT TRÊN SIDEBAR MENU */
         /* ========================================================= */
         @keyframes neon-border-pulse {
             0%, 100% {
                 background-color: #FF6600 !important;
                 border-color: #FF9933 !important;
-                box-shadow: 0 0 10px #FF6600, 
-                            0 0 20px #FF6600, 
-                            0 0 35px rgba(255, 102, 0, 0.9), 
-                            inset 0 0 10px rgba(255, 255, 255, 0.4) !important;
+                box-shadow: 0 0 8px #FF6600, 
+                            0 0 18px #FF6600, 
+                            0 0 30px rgba(255, 102, 0, 0.85), 
+                            inset 0 0 8px rgba(255, 255, 255, 0.5) !important;
                 transform: scale(1);
             }
             50% {
                 background-color: #FF3300 !important;
                 border-color: #FFEE00 !important;
-                box-shadow: 0 0 15px #FF3300, 
-                            0 0 30px #FF3300, 
-                            0 0 50px rgba(255, 51, 0, 1), 
-                            0 0 12px #FFEE00,
-                            inset 0 0 15px rgba(255, 255, 255, 0.6) !important;
+                box-shadow: 0 0 12px #FF3300, 
+                            0 0 25px #FF3300, 
+                            0 0 45px rgba(255, 51, 0, 1), 
+                            0 0 10px #FFEE00,
+                            inset 0 0 12px rgba(255, 255, 255, 0.7) !important;
                 transform: scale(1.03);
             }
         }
 
         .blink-btn button {
-            animation: neon-border-pulse 1.6s infinite ease-in-out !important;
+            animation: neon-border-pulse 1.5s infinite ease-in-out !important;
             color: #FFFFFF !important;
             font-weight: 800 !important;
-            font-size: 1rem !important;
+            font-size: 0.98rem !important;
             border-radius: 25px !important;
             border: 2px solid #FF9933 !important;
             transition: all 0.3s ease !important;
+            margin-top: 5px !important;
             margin-bottom: 15px !important;
-            text-shadow: 0 0 5px rgba(0, 0, 0, 0.5) !important;
+            text-shadow: 0 0 6px rgba(0, 0, 0, 0.6) !important;
         }
 
         .blink-btn button:hover {
             animation: none !important;
             background-color: #FF0000 !important;
             border-color: #FFFFFF !important;
-            box-shadow: 0 0 25px #FF0000, 0 0 50px #FF0000, 0 0 75px #FF0000 !important;
+            box-shadow: 0 0 20px #FF0000, 0 0 40px #FF0000, 0 0 60px #FF0000 !important;
             transform: scale(1.05) !important;
         }
 
@@ -247,7 +248,7 @@ st.sidebar.markdown(
 if "trigger_optimize" not in st.session_state:
     st.session_state.trigger_optimize = False
 
-# 🔘 NÚT TỐI ƯU LỘ TRÌNH ĐẶT NGAY DƯỚI "Make by BangNC13" VỚI VIỀN NEON TỎA SÁNG
+# 🔘 NÚT TỐI ƯU LỘ TRÌNH ĐẶT TRÊN SIDEBAR BÊN TRÁI VỚI VIỀN NEON TỎA SÁNG
 st.sidebar.markdown('<div class="blink-btn">', unsafe_allow_html=True)
 if st.sidebar.button(
     "🚀 Tối ưu lộ trình di chuyển", type="primary", use_container_width=True
@@ -476,7 +477,7 @@ if df is not None:
                 box-shadow: 0 0 15px #0066FF, 0 0 25px rgba(51, 153, 255, 1) !important;
             }}
 
-            /* 2. NÚT TỐI ƯU LỘ TRÌNH: NỀN CAM - BO VIỀN NEON CAM */
+            /* 2. NÚT TỐI ƯU LỘ TRÌNH TRÊN BẢN ĐỒ: NỀN CAM - BO VIỀN NEON CAM */
             .btn-orange-neon {{
                 background-color: #FF6600 !important;
                 color: #FFFFFF !important;
@@ -756,7 +757,7 @@ if df is not None:
                         }};
 
                         var btnToggleSidebar = L.DomUtil.create('div', 'leaflet-control-btn btn-green-neon', container);
-                        btnToggleSidebar.innerHTML = 'Menu';
+                        btnToggleSidebar.innerHTML = '👁️ Menu';
                         btnToggleSidebar.onclick = function() {{
                             var sidebarBtn = window.parent.document.querySelector('[data-testid="stSidebarCollapseButton"] button') ||
                                              window.parent.document.querySelector('button[aria-label="Close sidebar"]') ||
