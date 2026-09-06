@@ -138,7 +138,7 @@ st.markdown(
                 transform: scale(1);
             }
             25% {
-                opacity: 0.3; /* Tạo hiệu ứng nhấp nháy chớp tắt */
+                opacity: 0.3;
             }
             50% {
                 background-color: #FF1100 !important;
@@ -148,7 +148,7 @@ st.markdown(
                             0 0 50px rgba(255, 17, 0, 1), 
                             0 0 15px #FFEE00 !important;
                 opacity: 1;
-                transform: scale(1.04); /* Phồng nhẹ khi sáng nhất */
+                transform: scale(1.04);
             }
             75% {
                 opacity: 0.4;
@@ -169,7 +169,7 @@ st.markdown(
         }
 
         .blink-btn button:hover {
-            animation: none !important; /* Dừng nhấp nháy khi rê chuột vào */
+            animation: none !important;
             background-color: #FF0000 !important;
             border-color: #FFFFFF !important;
             box-shadow: 0 0 20px #FF0000, 0 0 40px #FF0000, 0 0 60px #FF0000 !important;
@@ -235,9 +235,7 @@ def load_excel_data():
 
 df, file_name = load_excel_data()
 
-# -------------------------------------------------------------
-# LOGO VÀO TRÊN CÙNG SIDEBAR CÓ NỀN TRONG SUỐT
-# -------------------------------------------------------------
+# Logo và Title Sidebar
 if os.path.exists("FPT_Telecom_logo.png"):
     st.sidebar.image("FPT_Telecom_logo.png", use_container_width=True)
 else:
@@ -251,11 +249,9 @@ st.sidebar.markdown(
     unsafe_allow_html=True,
 )
 
-# Khởi tạo session state kích hoạt tối ưu từ sidebar
 if "trigger_optimize" not in st.session_state:
     st.session_state.trigger_optimize = False
 
-# 🔘 NÚT TỐI ƯU LỘ TRÌNH ĐẶT TRÊN SIDEBAR BÊN TRÁI CÓ HIỆU ỨNG NHẤP NHÁY NEON
 st.sidebar.markdown('<div class="blink-btn">', unsafe_allow_html=True)
 if st.sidebar.button(
     "🚀 Tối ưu lộ trình di chuyển", type="primary", use_container_width=True
@@ -263,23 +259,39 @@ if st.sidebar.button(
     st.session_state.trigger_optimize = True
 st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
+# 3. Trích xuất dữ liệu điểm thông minh
+selected_data = []
+
 if df is not None:
     df.columns = [str(col).strip() for col in df.columns]
 
-    # Tìm tự động các cột Tên điểm, Vĩ độ (Lat), Kinh độ (Lng)
+    # Tìm cột Tên điểm
     name_col = next(
         (
             c
             for c in df.columns
-            if any(k in c.lower() for k in ["tên", "điểm", "kn", "station", "name"])
+            if any(
+                k in c.lower()
+                for k in [
+                    "tên",
+                    "điểm",
+                    "kn",
+                    "station",
+                    "name",
+                    "tập điểm",
+                    "mã",
+                ]
+            )
         ),
         df.columns[0],
     )
+
+    # Tìm cột Vĩ độ (Lat) và Kinh độ (Lng)
     lat_col = next(
         (
             c
             for c in df.columns
-            if any(k in c.lower() for k in ["lat", "vĩ độ", "vi do"])
+            if any(k in c.lower() for k in ["lat", "vĩ độ", "vi do", "y"])
         ),
         None,
     )
@@ -287,21 +299,28 @@ if df is not None:
         (
             c
             for c in df.columns
-            if any(k in c.lower() for k in ["lng", "lon", "kinh độ", "kinh do"])
+            if any(
+                k in c.lower()
+                for k in ["lng", "lon", "kinh độ", "kinh do", "x"]
+            )
         ),
         None,
     )
 
     points_dict = {}
+
     if lat_col and lon_col:
-        for _, row in df.iterrows():
-            p_name = str(row[name_col]).strip()
+        for idx, row in df.iterrows():
+            p_name = (
+                str(row[name_col]).strip()
+                if pd.notnull(row[name_col])
+                else f"Điểm {idx+1}"
+            )
             try:
                 if pd.notnull(row[lat_col]) and pd.notnull(row[lon_col]):
-                    points_dict[p_name] = {
-                        "lat": float(row[lat_col]),
-                        "lng": float(row[lon_col]),
-                    }
+                    lat_val = float(str(row[lat_col]).replace(",", "."))
+                    lon_val = float(str(row[lon_col]).replace(",", "."))
+                    points_dict[p_name] = {"lat": lat_val, "lng": lon_val}
             except Exception:
                 pass
     else:
@@ -309,7 +328,7 @@ if df is not None:
             (
                 c
                 for c in df.columns
-                if "lat" in c.lower() and "1" in c.lower()
+                if "lat" in c.lower() or "vĩ" in c.lower()
             ),
             None,
         )
@@ -317,24 +336,25 @@ if df is not None:
             (
                 c
                 for c in df.columns
-                if ("lng" in c.lower() or "lon" in c.lower()) and "1" in c.lower()
+                if "lng" in c.lower()
+                or "lon" in c.lower()
+                or "kinh" in c.lower()
             ),
             None,
         )
-        k1_col = next(
-            (c for c in df.columns if "kn1" in c.lower() or "điểm 1" in c.lower()),
-            name_col,
-        )
 
         if lat_col1 and lon_col1:
-            for _, row in df.iterrows():
-                p_name = str(row[k1_col]).strip()
+            for idx, row in df.iterrows():
+                p_name = (
+                    str(row[name_col]).strip()
+                    if pd.notnull(row[name_col])
+                    else f"Điểm {idx+1}"
+                )
                 try:
                     if pd.notnull(row[lat_col1]) and pd.notnull(row[lon_col1]):
-                        points_dict[p_name] = {
-                            "lat": float(row[lat_col1]),
-                            "lng": float(row[lon_col1]),
-                        }
+                        lat_val = float(str(row[lat_col1]).replace(",", "."))
+                        lon_val = float(str(row[lon_col1]).replace(",", "."))
+                        points_dict[p_name] = {"lat": lat_val, "lng": lon_val}
                 except Exception:
                     pass
 
@@ -343,29 +363,34 @@ if df is not None:
     st.sidebar.markdown("---")
     st.sidebar.subheader("📍 CHỌN CÁC TẬP ĐIỂM CẦN ĐẾN")
 
-    selected_points = st.sidebar.multiselect(
-        "Chọn các điểm cần đi qua:",
-        options=all_point_names,
-        default=(
-            all_point_names[:5]
-            if len(all_point_names) >= 5
-            else all_point_names
-        ),
-        help=(
-            "Thứ tự tối ưu sẽ được tự động tính toán dựa theo vị trí GPS xuất"
-            " phát của bạn."
-        ),
-    )
+    if len(all_point_names) > 0:
+        selected_points = st.sidebar.multiselect(
+            "Chọn các điểm cần đi qua:",
+            options=all_point_names,
+            default=(
+                all_point_names[:5]
+                if len(all_point_names) >= 5
+                else all_point_names
+            ),
+            help=(
+                "Thứ tự tối ưu sẽ được tự động tính toán dựa theo vị trí GPS"
+                " của bạn."
+            ),
+        )
 
-    selected_data = []
-    for p in selected_points:
-        selected_data.append({
-            "name": p,
-            "lat": points_dict[p]["lat"],
-            "lng": points_dict[p]["lng"],
-        })
+        for p in selected_points:
+            selected_data.append({
+                "name": p,
+                "lat": points_dict[p]["lat"],
+                "lng": points_dict[p]["lng"],
+            })
 
-    st.sidebar.info(f"Đã chọn **{len(selected_data)}** tập điểm.")
+        st.sidebar.info(f"Đã chọn **{len(selected_data)}** tập điểm.")
+    else:
+        st.sidebar.error(
+            "⚠️ Không tìm thấy dữ liệu tọa độ hợp lệ trong file Excel!"
+        )
+        st.sidebar.write("📌 Tên các cột hiện có trong file:", list(df.columns))
 
     map_center = [21.0285, 105.8542]
     if len(selected_data) > 0:
@@ -401,7 +426,6 @@ if df is not None:
                 background: #e5e3df;
             }}
 
-            /* ẨN TOÀN BỘ CÁC BIỂU TƯỢNG VÀ NÚT Ở GÓC DƯỚI BÊN PHẢI BẢN ĐỒ */
             .leaflet-bottom.leaflet-right {{
                 display: none !important;
                 visibility: hidden !important;
@@ -472,7 +496,6 @@ if df is not None:
                 transform: translateY(-2px);
             }}
 
-            /* 1. NÚT GPS: NỀN XANH DƯƠNG - BO VIỀN NEON XANH DƯƠNG */
             .btn-blue-neon {{
                 background-color: #0066FF !important;
                 color: #FFFFFF !important;
@@ -484,7 +507,6 @@ if df is not None:
                 box-shadow: 0 0 15px #0066FF, 0 0 25px rgba(51, 153, 255, 1) !important;
             }}
 
-            /* 2. NÚT TỐI ƯU LỘ TRÌNH TRÊN BẢN ĐỒ: NỀN CAM - BO VIỀN NEON CAM */
             .btn-orange-neon {{
                 background-color: #FF6600 !important;
                 color: #FFFFFF !important;
@@ -496,7 +518,6 @@ if df is not None:
                 box-shadow: 0 0 15px #FF6600, 0 0 25px rgba(255, 153, 51, 1) !important;
             }}
 
-            /* 3. NÚT MENU: NỀN XANH LÁ - BO VIỀN NEON XANH LÁ */
             .btn-green-neon {{
                 background-color: #00CC44 !important;
                 color: #FFFFFF !important;
@@ -508,7 +529,6 @@ if df is not None:
                 box-shadow: 0 0 15px #00CC44, 0 0 25px rgba(51, 255, 102, 1) !important;
             }}
 
-            /* 4. NÚT GOOGLE MAPS: NỀN TÍM NEON */
             .btn-purple-neon {{
                 background-color: #8B5CF6 !important;
                 color: #FFFFFF !important;
@@ -703,7 +723,6 @@ if df is not None:
                     return optimizedRoute;
                 }}
 
-                // Hàm mở đường đi qua App Google Maps
                 function openGoogleMapsApp() {{
                     if (!userLatLng) {{
                         alert("Chưa xác định được vị trí GPS hiện tại của bạn!");
@@ -795,7 +814,6 @@ if df is not None:
     """
 
     components.html(leaflet_html, height=1000, scrolling=False)
-
     st.session_state.trigger_optimize = False
 
 else:
