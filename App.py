@@ -190,7 +190,7 @@ if df is not None:
     if len(selected_data) > 0:
         map_center = [selected_data[0]["lat"], selected_data[0]["lng"]]
 
-    # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình
+    # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình + ZOOM MÁY TÍNH
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -318,14 +318,32 @@ if df is not None:
                     attribution: 'Google Maps Satellite'
                 }});
 
+                // BẬT CÁC TÍNH NĂNG CUỘN ZOOM (MOUSE WHEEL ZOOM)
                 var map = L.map('map', {{
                     zoomControl: false,
                     attributionControl: false,
+                    scrollWheelZoom: true,     // Cho phép phóng to/thu nhỏ bằng con lăn chuột
+                    smoothWheelZoom: true,     // Cuộn mượt hơn
+                    doubleClickZoom: true,     // Nhấp đôi chuột để zoom
+                    touchZoom: true,           // Zoom cảm ứng trên điện thoại/iPad
+                    boxZoom: true,
                     layers: [googleStreets]
                 }}).setView({json.dumps(map_center)}, 14);
 
+                // Thêm nút Nút Zoom (+/-) ở góc dưới bên trái
                 L.control.zoom({{ position: 'bottomleft' }}).addTo(map);
+
+                // Thêm Bảng Chọn Lớp Bản Đồ
                 L.control.layers({{ "🗺️ Đường phố": googleStreets, "🛰️ Vệ tinh": googleSat }}, null, {{ position: 'bottomright' }}).addTo(map);
+
+                // Thêm thanh thước đo khoảng cách (Scale Bar)
+                L.control.scale({{ metric: true, imperial: false, position: 'bottomright' }}).addTo(map);
+
+                // Giữ tiêu điểm chuột tự động vào map khi di chuyển chuột qua để nhận phím cuộn
+                var mapElement = document.getElementById('map');
+                mapElement.addEventListener('mouseenter', function () {{
+                    mapElement.focus();
+                }});
 
                 var targets = {json.dumps(selected_data)};
                 var markersGroup = L.layerGroup().addTo(map);
