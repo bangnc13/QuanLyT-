@@ -6,7 +6,7 @@ import streamlit.components.v1 as components
 
 # 1. Cấu hình trang Streamlit
 st.set_page_config(
-    page_title="Tối Ưu Lộ Trình Di Chuyển Tập Điểm",
+    page_title="Tối Ưu Lộ Trình Di Chuyển Xe Máy",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -280,10 +280,10 @@ if df is not None:
     all_point_names = sorted(list(points_dict.keys()))
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("📍 CHỌN CÁC TẬP ĐIỂM CẦN ĐẾN")
+    st.sidebar.subheader("🛵 CẤU HÌNH LỘ TRÌNH XE MÁY")
 
     selected_points = st.sidebar.multiselect(
-        "",
+        "📍 Chọn các tập điểm cần đến:",
         options=all_point_names,
         default=(
             all_point_names[:5]
@@ -291,7 +291,7 @@ if df is not None:
             else all_point_names
         ),
         help=(
-            "Thứ tự tối ưu sẽ được tự động tính toán dựa theo vị trí GPS xuất"
+            "Thứ tự tối ưu di chuyển bằng xe máy sẽ được tự động tính toán dựa theo vị trí GPS xuất"
             " phát của bạn."
         ),
     )
@@ -308,7 +308,7 @@ if df is not None:
 
     # 🔘 NÚT TỐI ƯU LỘ TRÌNH TRÊN SIDEBAR
     if st.sidebar.button(
-        "🚀 Tối ưu lộ trình di chuyển", type="primary", use_container_width=True
+        "🛵 Tối ưu lộ trình xe máy", type="primary", use_container_width=True
     ):
         st.session_state.trigger_optimize = True
 
@@ -316,7 +316,7 @@ if df is not None:
     if len(selected_data) > 0:
         map_center = [selected_data[0]["lat"], selected_data[0]["lng"]]
 
-    # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình + Google Maps
+    # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình Xe Máy + Google Maps
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -429,7 +429,7 @@ if df is not None:
                 box-shadow: 0 0 15px #0066FF, 0 0 25px rgba(51, 153, 255, 1) !important;
             }}
 
-            /* 2. NÚT TỐI ƯU LỘ TRÌNH: NỀN CAM */
+            /* 2. NÚT TỐI ƯU LỘ TRÌNH: NỀN CAM XE MÁY */
             .btn-orange-neon {{
                 background-color: #FF6600 !important;
                 color: #FFFFFF !important;
@@ -441,7 +441,7 @@ if df is not None:
                 box-shadow: 0 0 15px #FF6600, 0 0 25px rgba(255, 153, 51, 1) !important;
             }}
 
-            /* 3. NÚT GOOGLE MAPS: NỀN ĐỎ NEON */
+            /* 3. NÚT GOOGLE MAPS XE MÁY: NỀN ĐỎ NEON */
             .btn-gmaps-neon {{
                 background-color: #EA4335 !important;
                 color: #FFFFFF !important;
@@ -522,7 +522,7 @@ if df is not None:
                     }} else {{
                         var userIcon = L.divIcon({{ className: 'user-location-marker' }});
                         userMarker = L.marker(e.latlng, {{ icon: userIcon }}).addTo(map)
-                            .bindPopup("<b>Vị trí xuất phát của bạn (GPS)</b>");
+                            .bindPopup("<b>Vị trí xuất phát xe máy (GPS)</b>");
                         accuracyCircle = L.circle(e.latlng, radius, {{
                             color: '#2563EB',
                             fillColor: '#3B82F6',
@@ -544,6 +544,7 @@ if df is not None:
                 }});
                 map.locate({{ watch: true, setView: false, enableHighAccuracy: true }});
 
+                // Khoảng cách theo bán kính Trái Đất (Haversine)
                 function getDistance(lat1, lon1, lat2, lon2) {{
                     var R = 6371;
                     var dLat = (lat2 - lat1) * Math.PI / 180;
@@ -555,6 +556,7 @@ if df is not None:
                     return R * c;
                 }}
 
+                // Giải bài toán người giao hàng (TSP) bằng Thuật toán Láng giềng gần nhất (Nearest Neighbor)
                 function solveTSP(startPt, pts) {{
                     var unvisited = pts.slice();
                     var route = [startPt];
@@ -621,7 +623,7 @@ if df is not None:
                         }});
 
                         var m = L.marker([pt.lat, pt.lng], {{ icon: numIcon }});
-                        var popupMsg = idx === 0 ? "<b>Điểm Xuất Phát (GPS)</b>" : "<b>Thứ tự " + idx + ":</b> " + pt.name;
+                        var popupMsg = idx === 0 ? "<b>Điểm Xuất Phát Xe Máy (GPS)</b>" : "<b>Thứ tự " + idx + ":</b> " + pt.name;
                         
                         m.bindPopup(popupMsg);
                         markersGroup.addLayer(m);
@@ -635,19 +637,24 @@ if df is not None:
                         map.removeControl(routingControl);
                     }}
 
+                    // Cấu hình Routing Engine sử dụng OSRM với profile 'bike' / 'driving' tối ưu hẻm nhỏ cho xe máy
                     routingControl = L.Routing.control({{
                         waypoints: waypoints,
                         routeWhileDragging: false,
                         addWaypoints: false,
                         show: false,
                         createMarker: function() {{ return null; }},
+                        router: L.Routing.osrmv1({{
+                            serviceUrl: 'https://router.project-osrm.org/route/v1',
+                            profile: 'bike' // Sử dụng profile xe máy / xe hai bánh
+                        }}),
                         lineOptions: {{
                             styles: [{{ color: '#FF6600', opacity: 0.85, weight: 6 }}]
                         }}
                     }}).addTo(map);
                 }}
 
-                // Hàm mở Google Maps với lộ trình đã được sắp xếp
+                // Hàm mở Google Maps với chế độ Chỉ đường Xe Máy (Two-wheeler mode)
                 function openGoogleMaps() {{
                     if (targets.length === 0) {{
                         alert("Vui lòng chọn ít nhất 1 tập điểm.");
@@ -678,6 +685,7 @@ if df is not None:
                         waypointsArr.push(routePoints[i].lat + "," + routePoints[i].lng);
                     }}
 
+                    // Tùy chỉnh URL Google Maps ép buộc phương tiện di chuyển là XE MÁY (travelmode=two-wheeler / bicycling)
                     var mapsUrl = "https://www.google.com/maps/dir/?api=1" +
                         "&origin=" + encodeURIComponent(origin) +
                         "&destination=" + encodeURIComponent(destination);
@@ -686,7 +694,8 @@ if df is not None:
                         mapsUrl += "&waypoints=" + encodeURIComponent(waypointsArr.join("|"));
                     }}
 
-                    mapsUrl += "&travelmode=driving";
+                    // Phương tiện di chuyển: two-wheeler (xe máy/xe hai bánh)
+                    mapsUrl += "&travelmode=two-wheeler";
 
                     window.open(mapsUrl, '_blank');
                 }}
@@ -698,7 +707,7 @@ if df is not None:
 
                         // 1. Nút GPS
                         var btnLocate = L.DomUtil.create('div', 'leaflet-control-btn btn-blue-neon', container);
-                        btnLocate.innerHTML = '🎯 GPS';
+                        btnLocate.innerHTML = '🎯 GPS Xe Máy';
                         btnLocate.onclick = function() {{
                             if (userLatLng) {{
                                 map.setView(userLatLng, 17);
@@ -707,16 +716,16 @@ if df is not None:
                             }}
                         }};
 
-                        // 2. Nút Tối ưu lộ trình
+                        // 2. Nút Tối ưu lộ trình Xe máy
                         var btnRoute = L.DomUtil.create('div', 'leaflet-control-btn btn-orange-neon', container);
-                        btnRoute.innerHTML = '🚀 Tối ưu lộ trình';
+                        btnRoute.innerHTML = '🛵 Tối ưu xe máy';
                         btnRoute.onclick = function() {{
                             optimizeAndRoute(false);
                         }};
 
-                        // 3. Nút Google Maps
+                        // 3. Nút Google Maps Xe máy
                         var btnGmaps = L.DomUtil.create('div', 'leaflet-control-btn btn-gmaps-neon', container);
-                        btnGmaps.innerHTML = '🗺️ Google Maps';
+                        btnGmaps.innerHTML = '🗺️ Google Maps Xe Máy';
                         btnGmaps.onclick = function() {{
                             openGoogleMaps();
                         }};
