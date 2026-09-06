@@ -6,12 +6,12 @@ import streamlit.components.v1 as components
 
 # 1. Cấu hình trang Streamlit
 st.set_page_config(
-    page_title="Make by BangNC13",
+    page_title="Tối Ưu Lộ Trình Di Chuyển Xe Máy",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Trong Suốt & Nút bấm Toggle xanh Neon
+# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Trong Suốt & Chữ Menu Màu Xanh Dương
 st.markdown(
     """
     <style>
@@ -60,7 +60,7 @@ st.markdown(
         /* 2. LÀM TRONG SUỐT VÀ MỜ KÍNH CHO SIDEBAR (MENU) */
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
-            background-color: rgba(255, 255, 255, 0.4) !important;
+            background-color: rgba(255, 255, 255, 0.5) !important;
             backdrop-filter: blur(12px) !important;
             -webkit-backdrop-filter: blur(12px) !important;
             border-right: 1px solid rgba(255, 255, 255, 0.3) !important;
@@ -75,7 +75,51 @@ st.markdown(
             padding-right: 1rem !important;
         }
 
-        /* 3. LÀM NỀN LOGO TRONG SUỐT HOÀN TOÀN */
+        /* ========================================================= */
+        /* 3. ĐIỀU CHỈNH MÀU CHỮ TRÊN SIDEBAR (MENU) THÀNH MÀU XANH DƯƠNG */
+        /* ========================================================= */
+        section[data-testid="stSidebar"] *,
+        section[data-testid="stSidebar"] p,
+        section[data-testid="stSidebar"] span,
+        section[data-testid="stSidebar"] label,
+        section[data-testid="stSidebar"] h1,
+        section[data-testid="stSidebar"] h2,
+        section[data-testid="stSidebar"] h3,
+        section[data-testid="stSidebar"] h4,
+        section[data-testid="stSidebar"] div {
+            color: #0044CC !important;
+        }
+
+        /* Tiêu đề & Subtitle trong Sidebar */
+        .sidebar-title {
+            font-size: 1.15rem !important;
+            font-weight: 700 !important;
+            color: #003399 !important;
+            margin-bottom: 2px !important;
+        }
+        .sidebar-subtitle {
+            font-size: 0.85rem !important;
+            color: #0055FF !important;
+            margin-bottom: 12px !important;
+            font-weight: 700 !important;
+        }
+
+        /* Tùy chỉnh màu chữ các ô Select/Multiselect trong Sidebar */
+        section[data-testid="stSidebar"] div[data-baseweb="select"] * {
+            color: #003399 !important;
+        }
+        
+        /* Màu các thẻ tag đã chọn trong Multiselect */
+        section[data-testid="stSidebar"] span[data-baseweb="tag"] {
+            background-color: #E6F0FF !important;
+            border: 1px solid #99C2FF !important;
+        }
+        section[data-testid="stSidebar"] span[data-baseweb="tag"] * {
+            color: #0044CC !important;
+            font-weight: 600 !important;
+        }
+
+        /* 4. LÀM NỀN LOGO TRONG SUỐT HOÀN TOÀN */
         [data-testid="stSidebar"] [data-testid="stImage"] {
             background: transparent !important;
             backdrop-filter: none !important;
@@ -93,7 +137,7 @@ st.markdown(
             object-fit: contain !important;
         }
 
-        /* 4. BO TRÒN VÀ MÀU XANH NEON CHO NÚT MỞ/ẨN SIDEBAR CỦA STREAMLIT */
+        /* 5. BO TRÒN VÀ MÀU XANH NEON CHO NÚT MỞ/ẨN SIDEBAR CỦA STREAMLIT */
         [data-testid="stSidebarCollapseButton"], 
         [data-testid="stSidebarNavItems"] button,
         button[aria-label="Close sidebar"],
@@ -109,19 +153,6 @@ st.markdown(
             background-color: #00CC52 !important;
             box-shadow: 0 0 18px #00FF66, 0 0 30px rgba(0, 255, 102, 0.9) !important;
             transform: scale(1.05);
-        }
-
-        .sidebar-title {
-            font-size: 1.15rem !important;
-            font-weight: 700 !important;
-            color: #111827 !important;
-            margin-bottom: 2px !important;
-        }
-        .sidebar-subtitle {
-            font-size: 0.8rem !important;
-            color: #374151 !important;
-            margin-bottom: 12px !important;
-            font-weight: 500 !important;
         }
 
         .main .block-container, 
@@ -280,7 +311,7 @@ if df is not None:
     all_point_names = sorted(list(points_dict.keys()))
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("🛵 CHỌN CÁC ĐIỂM CẦN ĐẾN")
+    st.sidebar.subheader("🛵 CẤU HÌNH LỘ TRÌNH XE MÁY")
 
     selected_points = st.sidebar.multiselect(
         "📍 Chọn các tập điểm cần đến:",
@@ -308,7 +339,7 @@ if df is not None:
 
     # 🔘 NÚT TỐI ƯU LỘ TRÌNH TRÊN SIDEBAR
     if st.sidebar.button(
-        "🛵 Tối ưu lộ trình", type="primary", use_container_width=True
+        "🛵 Tối ưu lộ trình xe máy", type="primary", use_container_width=True
     ):
         st.session_state.trigger_optimize = True
 
@@ -707,7 +738,7 @@ if df is not None:
 
                         // 1. Nút GPS
                         var btnLocate = L.DomUtil.create('div', 'leaflet-control-btn btn-blue-neon', container);
-                        btnLocate.innerHTML = '🎯 GPS';
+                        btnLocate.innerHTML = '🎯 GPS Xe Máy';
                         btnLocate.onclick = function() {{
                             if (userLatLng) {{
                                 map.setView(userLatLng, 17);
@@ -718,14 +749,14 @@ if df is not None:
 
                         // 2. Nút Tối ưu lộ trình Xe máy
                         var btnRoute = L.DomUtil.create('div', 'leaflet-control-btn btn-orange-neon', container);
-                        btnRoute.innerHTML = '🛵 Update lộ trình';
+                        btnRoute.innerHTML = '🛵 Tối ưu xe máy';
                         btnRoute.onclick = function() {{
                             optimizeAndRoute(false);
                         }};
 
                         // 3. Nút Google Maps Xe máy
                         var btnGmaps = L.DomUtil.create('div', 'leaflet-control-btn btn-gmaps-neon', container);
-                        btnGmaps.innerHTML = '🗺️ Google Maps';
+                        btnGmaps.innerHTML = '🗺️ Google Maps Xe Máy';
                         btnGmaps.onclick = function() {{
                             openGoogleMaps();
                         }};
