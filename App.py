@@ -99,7 +99,7 @@ def load_excel_data():
 df, file_name = load_excel_data() 
 
 st.sidebar.markdown('<div class="sidebar-title">🗺️ TỐI ƯU LỘ TRÌNH TẬP ĐIỂM</div>', unsafe_allow_html=True)
-st.sidebar.markdown('<div class="sidebar-subtitle">Định vị GPS Realtime & Tối ưu lộ trình đi qua các điểm</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="sidebar-subtitle">Tối ưu quãng đường thu cước - Make by BangNC13 </div>', unsafe_allow_html=True)
 
 # Khởi tạo session state kích hoạt tối ưu từ sidebar
 if "trigger_optimize" not in st.session_state:
