@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Trong Suốt & Nút bấm Toggle xanh Neon
+# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Trong Suốt, Nút bấm Toggle xanh Neon & Hiệu ứng nhấp nháy
 st.markdown(
     """
     <style>
@@ -124,6 +124,31 @@ st.markdown(
             font-weight: 500 !important;
         }
 
+        /* HIỆU ỨNG NHẤP NHÁY / NHỊP THỞ PHÁT SÁNG CHO NÚT SIDEBAR */
+        @keyframes pulseGlow {
+            0% {
+                box-shadow: 0 0 8px #FF6600, 0 0 15px rgba(255, 102, 0, 0.4);
+                transform: scale(1);
+            }
+            50% {
+                box-shadow: 0 0 20px #FF9933, 0 0 35px rgba(255, 153, 51, 0.9);
+                transform: scale(1.02);
+            }
+            100% {
+                box-shadow: 0 0 8px #FF6600, 0 0 15px rgba(255, 102, 0, 0.4);
+                transform: scale(1);
+            }
+        }
+
+        /* Áp dụng hiệu ứng nhấp nháy vào nút bấm Tối ưu lộ trình ở sidebar */
+        [data-testid="stSidebar"] div.stButton > button {
+            animation: pulseGlow 1.8s infinite ease-in-out !important;
+            border-radius: 20px !important;
+            font-weight: bold !important;
+            margin-top: 6px !important;
+            margin-bottom: 12px !important;
+        }
+
         .main .block-container, 
         [data-testid="stMainBlockContainer"],
         [data-testid="stVerticalBlock"],
@@ -201,6 +226,12 @@ st.sidebar.markdown(
 # Khởi tạo session state kích hoạt tối ưu từ sidebar
 if "trigger_optimize" not in st.session_state:
     st.session_state.trigger_optimize = False
+
+# 🔘 NÚT TỐI ƯU LỘ TRÌNH ĐẶT NGAY DƯỚI "Make by BangNC13"
+if st.sidebar.button(
+    "🚀 Tối ưu lộ trình di chuyển", type="primary", use_container_width=True
+):
+    st.session_state.trigger_optimize = True
 
 if df is not None:
     df.columns = [str(col).strip() for col in df.columns]
@@ -305,12 +336,6 @@ if df is not None:
         })
 
     st.sidebar.info(f"Đã chọn **{len(selected_data)}** tập điểm.")
-
-    # 🔘 NÚT TỐI ƯU LỘ TRÌNH TRÊN SIDEBAR
-    if st.sidebar.button(
-        "🚀 Tối ưu lộ trình di chuyển", type="primary", use_container_width=True
-    ):
-        st.session_state.trigger_optimize = True
 
     map_center = [21.0285, 105.8542]
     if len(selected_data) > 0:
