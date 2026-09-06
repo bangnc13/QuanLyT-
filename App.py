@@ -6,7 +6,7 @@ import streamlit.components.v1 as components
 
 # 1. Cấu hình trang Streamlit
 st.set_page_config(
-    page_title="Tối Ưu Lộ Trình Di Chuyển Tập Điểm",
+    page_title="Tool-BangNC13",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -229,7 +229,7 @@ if "trigger_optimize" not in st.session_state:
 
 # 🔘 NÚT TỐI ƯU LỘ TRÌNH ĐẶT NGAY DƯỚI "Make by BangNC13"
 if st.sidebar.button(
-    "🚀 Tối ưu lộ trình di chuyển", type="primary", use_container_width=True
+    "🚀 Tối ưu lộ trình", type="primary", use_container_width=True
 ):
     st.session_state.trigger_optimize = True
 
