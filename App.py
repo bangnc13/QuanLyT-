@@ -120,7 +120,7 @@ st.markdown(
         .sidebar-subtitle {
             font-size: 0.8rem !important;
             color: #374151 !important;
-            margin-bottom: 12px !important;
+            margin-bottom: 4px !important;
             font-weight: 500 !important;
         }
 
@@ -141,12 +141,19 @@ st.markdown(
         }
 
         /* Áp dụng hiệu ứng nhấp nháy vào nút bấm Tối ưu lộ trình ở sidebar */
+        [data-testid="stSidebar"] div.stButton {
+            display: flex !important;
+            justify-content: center !important;
+        }
+
         [data-testid="stSidebar"] div.stButton > button {
             animation: pulseGlow 1.8s infinite ease-in-out !important;
             border-radius: 20px !important;
             font-weight: bold !important;
-            margin-top: 6px !important;
+            padding: 6px 18px !important;
+            margin-top: 4px !important;
             margin-bottom: 12px !important;
+            width: auto !important;
         }
 
         .main .block-container, 
@@ -223,13 +230,16 @@ st.sidebar.markdown(
     unsafe_allow_html=True,
 )
 
+# Khoảng trắng phân cách giữa subheader và nút bấm
+st.sidebar.write("")
+
 # Khởi tạo session state kích hoạt tối ưu từ sidebar
 if "trigger_optimize" not in st.session_state:
     st.session_state.trigger_optimize = False
 
-# 🔘 NÚT TỐI ƯU LỘ TRÌNH ĐẶT NGAY DƯỚI "Make by BangNC13"
+# 🔘 NÚT TỐI ƯU LỘ TRÌNH VỚI KÍCH THƯỚC VỪA VẶN CHỮ VÀ DỜI XUỐNG 1 KHOẢNG TRẮNG
 if st.sidebar.button(
-    "🚀 Tối ưu lộ trình", type="primary", use_container_width=True
+    "🚀 Tối ưu lộ trình", type="primary", use_container_width=False
 ):
     st.session_state.trigger_optimize = True
 
