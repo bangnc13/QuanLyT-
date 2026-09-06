@@ -6,7 +6,7 @@ import streamlit.components.v1 as components
 
 # 1. Cấu hình trang Streamlit
 st.set_page_config(
-    page_title="Tối Ưu Lộ Trình Di Chuyển Xe Máy",
+    page_title="Make by BangNC13",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -280,7 +280,7 @@ if df is not None:
     all_point_names = sorted(list(points_dict.keys()))
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("🛵 CẤU HÌNH LỘ TRÌNH XE MÁY")
+    st.sidebar.subheader("🛵 CHỌN CÁC ĐIỂM CẦN ĐẾN")
 
     selected_points = st.sidebar.multiselect(
         "📍 Chọn các tập điểm cần đến:",
@@ -308,7 +308,7 @@ if df is not None:
 
     # 🔘 NÚT TỐI ƯU LỘ TRÌNH TRÊN SIDEBAR
     if st.sidebar.button(
-        "🛵 Tối ưu lộ trình xe máy", type="primary", use_container_width=True
+        "🛵 Tối ưu lộ trình", type="primary", use_container_width=True
     ):
         st.session_state.trigger_optimize = True
 
@@ -707,7 +707,7 @@ if df is not None:
 
                         // 1. Nút GPS
                         var btnLocate = L.DomUtil.create('div', 'leaflet-control-btn btn-blue-neon', container);
-                        btnLocate.innerHTML = '🎯 GPS Xe Máy';
+                        btnLocate.innerHTML = '🎯 GPS';
                         btnLocate.onclick = function() {{
                             if (userLatLng) {{
                                 map.setView(userLatLng, 17);
@@ -718,14 +718,14 @@ if df is not None:
 
                         // 2. Nút Tối ưu lộ trình Xe máy
                         var btnRoute = L.DomUtil.create('div', 'leaflet-control-btn btn-orange-neon', container);
-                        btnRoute.innerHTML = '🛵 Tối ưu xe máy';
+                        btnRoute.innerHTML = '🛵 update lộ trình';
                         btnRoute.onclick = function() {{
                             optimizeAndRoute(false);
                         }};
 
                         // 3. Nút Google Maps Xe máy
                         var btnGmaps = L.DomUtil.create('div', 'leaflet-control-btn btn-gmaps-neon', container);
-                        btnGmaps.innerHTML = '🗺️ Google Maps Xe Máy';
+                        btnGmaps.innerHTML = '🗺️ Google Maps';
                         btnGmaps.onclick = function() {{
                             openGoogleMaps();
                         }};
