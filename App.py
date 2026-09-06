@@ -98,7 +98,7 @@ def load_excel_data():
 
 df, file_name = load_excel_data() 
 
-st.sidebar.markdown('<div class="sidebar-title"></div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="sidebar-title">Tối Ưu Lộ Trình</div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="sidebar-subtitle">Tối ưu quãng đường thu cước - Make by BangNC13 </div>', unsafe_allow_html=True)
 
 # Khởi tạo session state kích hoạt tối ưu từ sidebar
@@ -250,16 +250,10 @@ if df is not None:
             .leaflet-control-btn:hover {{
                 background-color: #f4f4f4;
             }}
+            
+            /* 🔥 ẨN HÒAN TOÀN BẢNG HƯỚNG DẪN CHỈ ĐƯỜNG (LEAFLET ROUTING CONTAINER) */
             .leaflet-routing-container {{
-                background: white !important;
-                padding: 10px !important;
-                border-radius: 8px !important;
-                max-height: 280px !important;
-                overflow-y: auto !important;
-                font-size: 12px !important;
-            }}
-            .leaflet-bottom {{
-                margin-bottom: 10px;
+                display: none !important;
             }}
         </style>
     </head>
@@ -434,7 +428,8 @@ if df is not None:
                         waypoints: waypoints,
                         routeWhileDragging: false,
                         addWaypoints: false,
-                        show: true,
+                        show: false, // Tắt giao diện chỉ đường mặc định
+                        createMarker: function() {{ return null; }}, // Không tạo các marker mặc định đè lên
                         lineOptions: {{
                             styles: [{{ color: '#10B981', opacity: 0.85, weight: 6 }}]
                         }}
@@ -488,6 +483,9 @@ if df is not None:
     """
 
     components.html(leaflet_html, height=1000, scrolling=False)
+
+    # Đặt lại trigger sau khi đã render xong
+    st.session_state.trigger_optimize = False
 
 else:
     st.warning("⚠️ Không tìm thấy tệp dữ liệu Excel `.xlsx` hoặc `.xls` trong thư mục làm việc.")
