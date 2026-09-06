@@ -195,7 +195,7 @@ if df is not None:
     st.sidebar.info(f"Đã chọn **{len(selected_data)}** tập điểm.")
 
     # 🔘 NÚT TỐI ƯU LỘ TRÌNH TRÊN SIDEBAR
-    if st.sidebar.button("🚀 Tối ưu lộ trình di chuyển", type="primary", use_container_width=True):
+    if st.sidebar.button("🚀 Tối ưu lộ trình", type="primary", use_container_width=True):
         st.session_state.trigger_optimize = True
 
     map_center = [21.0285, 105.8542]
