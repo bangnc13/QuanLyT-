@@ -1,3 +1,5 @@
+Python
+
 import os
 import json
 import pandas as pd
@@ -99,7 +101,7 @@ def load_excel_data():
 df, file_name = load_excel_data() 
 
 st.sidebar.markdown('<div class="sidebar-title">🗺️ TỐI ƯU LỘ TRÌNH TẬP ĐIỂM</div>', unsafe_allow_html=True)
-st.sidebar.markdown('<div class="sidebar-subtitle">Định vị GPS Realtime & Tối ưu lộ trình đi qua các điểm</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="sidebar-subtitle">Định vị GPS Realtime & Tối ưu lộ trình di chuyển</div>', unsafe_allow_html=True)
 
 # Khởi tạo session state kích hoạt tối ưu từ sidebar
 if "trigger_optimize" not in st.session_state:
@@ -147,11 +149,12 @@ if df is not None:
     st.sidebar.markdown("---")
     st.sidebar.subheader("📍 CHỌN CÁC TẬP ĐIỂM CẦN ĐẾN")
     
+    # MẶC ĐỊNH LÀ TRỐNG (default=[]) KHI MỞ LINK
     selected_points = st.sidebar.multiselect(
         "Chọn các điểm cần đi qua:",
         options=all_point_names,
-        default=all_point_names[:5] if len(all_point_names) >= 5 else all_point_names,
-        help="Thứ tự tối ưu sẽ được tự động tính toán dựa theo vị trí GPS xuất phát của bạn."
+        default=[], 
+        help="Chọn các điểm bạn cần đi qua. Bấm nút Tối ưu lộ trình để tính tuyến đường ngắn nhất."
     )
 
     selected_data = []
@@ -171,8 +174,11 @@ if df is not None:
     map_center = [21.0285, 105.8542]
     if len(selected_data) > 0:
         map_center = [selected_data[0]["lat"], selected_data[0]["lng"]]
+    elif len(points_dict) > 0:
+        first_p = list(points_dict.values())[0]
+        map_center = [first_p["lat"], first_p["lng"]]
 
-    # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình
+    # Leaflet HTML
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -211,7 +217,6 @@ if df is not None:
                 margin-top: -10px !important;
                 box-shadow: 0 0 10px rgba(37, 99, 235, 0.8);
             }}
-            /* CSS Đánh số thứ tự các điểm trên bản đồ */
             .number-icon {{
                 background-color: #EF4444;
                 color: #FFFFFF;
@@ -289,7 +294,6 @@ if df is not None:
                 var targets = {json.dumps(selected_data)};
                 var markersGroup = L.layerGroup().addTo(map);
 
-                // Vẽ các điểm ban đầu
                 function renderInitialMarkers() {{
                     markersGroup.clearLayers();
                     targets.forEach(function(pt) {{
@@ -307,7 +311,7 @@ if df is not None:
                 }}
                 renderInitialMarkers();
 
-                // Định vị GPS
+                // GPS Realtime
                 var userLatLng = null;
                 var userMarker = null;
                 var accuracyCircle = null;
@@ -338,7 +342,6 @@ if df is not None:
                 }});
                 map.locate({{ watch: true, setView: false, enableHighAccuracy: true }});
 
-                // Thuật toán Haversine
                 function getDistance(lat1, lon1, lat2, lon2) {{
                     var R = 6371;
                     var dLat = (lat2 - lat1) * Math.PI / 180;
@@ -350,7 +353,6 @@ if df is not None:
                     return R * c;
                 }}
 
-                // Giải bài toán TSP
                 function solveTSP(startPt, pts) {{
                     var unvisited = pts.slice();
                     var route = [startPt];
@@ -373,7 +375,6 @@ if df is not None:
                         unvisited.splice(nearestIdx, 1);
                     }}
 
-                    // Quay về điểm GPS ban đầu
                     route.push(startPt);
                     return route;
                 }}
@@ -387,14 +388,13 @@ if df is not None:
                     }}
 
                     if (targets.length === 0) {{
-                        alert("Vui lòng chọn ít nhất 1 tập điểm ở Sidebar.");
+                        alert("Chưa có tập điểm nào được chọn! Vui lòng chọn điểm ở Sidebar bên trái.");
                         return;
                     }}
 
                     var startPoint = {{ name: "Điểm Xuất Phát (GPS)", lat: userLatLng.lat, lng: userLatLng.lng }};
                     var optimizedRoute = solveTSP(startPoint, targets);
 
-                    // Xóa marker cũ và thay bằng Marker có ĐÁNH SỐ THỨ TỰ
                     markersGroup.clearLayers();
 
                     optimizedRoute.forEach(function(pt, idx) {{
@@ -405,7 +405,7 @@ if df is not None:
                             labelText = '🏁';
                             iconClass = 'start-end-icon';
                         }} else if (idx === optimizedRoute.length - 1) {{
-                            return; // Điểm cuối trùng điểm xuất phát
+                            return;
                         }}
 
                         var numIcon = L.divIcon({{
@@ -441,7 +441,6 @@ if df is not None:
                     }}).addTo(map);
                 }}
 
-                // Nút điều khiển nhanh góc trên trái
                 var CustomControls = L.Control.extend({{
                     options: {{ position: 'topleft' }},
                     onAdd: function (map) {{
@@ -474,7 +473,6 @@ if df is not None:
 
                 map.addControl(new CustomControls());
 
-                // Tự động kích hoạt khi bấm nút trên Sidebar
                 var autoOptimize = {json.dumps(st.session_state.trigger_optimize)};
                 if (autoOptimize) {{
                     setTimeout(function() {{
