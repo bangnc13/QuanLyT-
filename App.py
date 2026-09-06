@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="auto",
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Trong Suốt & Sửa lỗi mất danh sách chọn
+# CSS Tùy chỉnh giao diện Fullscreen & Khắc phục triệt để lỗi mất danh sách Multiselect
 st.markdown(
     """
     <style>
@@ -46,7 +46,7 @@ st.markdown(
         }
 
         /* ========================================================= */
-        /* 1. Thiết lập giao diện tràn màn hình nhưng CHO PHÉP CUỘN SIDEBAR */
+        /* 1. Thiết lập giao diện tràn màn hình */
         /* ========================================================= */
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
             margin: 0 !important;
@@ -56,32 +56,46 @@ st.markdown(
             background-color: transparent !important;
         }
 
-        /* 2. LÀM TRONG SUỐT VÀ CHO PHÉP CUỘN DỌC TRONG SIDEBAR */
+        /* ========================================================= */
+        /* 2. SỬA LỖI HIỂN THỊ MULTISELECT TRÊN MOBILE (BẮT BUỘC) */
+        /* ========================================================= */
+        /* Đảm bảo Sidebar luôn nổi trên bản đồ và có thể cuộn */
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
-            background-color: rgba(255, 255, 255, 0.45) !important;
-            backdrop-filter: blur(12px) !important;
-            -webkit-backdrop-filter: blur(12px) !important;
-            border-right: 1px solid rgba(255, 255, 255, 0.3) !important;
-            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.05) !important;
-            overflow-y: auto !important; /* Cho phép cuộn khi danh sách quá dài */
+            background-color: rgba(255, 255, 255, 0.75) !important;
+            backdrop-filter: blur(14px) !important;
+            -webkit-backdrop-filter: blur(14px) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.4) !important;
+            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1) !important;
+            overflow-y: auto !important;
+            overflow-x: visible !important;
         }
 
-        /* Điều chỉnh container bên trong Sidebar để không bị cắt bớt nội dung */
+        /* Cho phép nội dung Sidebar tràn ra ngoài nếu là menu xổ xuống */
         section[data-testid="stSidebar"] > div:first-child {
             background: transparent !important;
-            padding-top: 1rem !important;
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
-            padding-bottom: 3rem !important; /* Thêm khoảng trống ở đáy để cuộn dễ dàng */
+            padding: 1rem !important;
+            padding-bottom: 8rem !important; /* Khoảng trống cuộn dưới chân */
             height: auto !important;
-            max-height: 100vh !important;
+            min-height: 100vh !important;
+            overflow-y: visible !important;
+            overflow-x: visible !important;
+        }
+
+        /* Bắt buộc khung hiển thị danh sách thả xuống (Popover/Dropdown) phải nổi lên trên cùng tuyệt đối */
+        div[data-baseweb="popover"], 
+        div[data-baseweb="menu"],
+        div[role="listbox"],
+        div[aria-label="dropdown menu"] {
+            z-index: 2000000 !important;
+            position: fixed !important;
+            max-height: 50vh !important;
             overflow-y: auto !important;
         }
 
-        /* SỬA LỖI MENU DROP-DOWN CHO MULTISELECT: Đảm bảo popup danh sách hiện lên trên cùng */
-        div[data-baseweb="popover"], div[aria-label="dropdown menu"] {
-            z-index: 1000005 !important;
+        /* Sửa giao diện Multiselect gọn gàng hơn trên màn hình nhỏ */
+        div[data-baseweb="select"] {
+            z-index: 100000 !important;
         }
 
         /* 3. LÀM NỀN LOGO TRONG SUỐT HOÀN TOÀN */
@@ -317,7 +331,7 @@ if df is not None:
     st.sidebar.subheader("📍 CHỌN CÁC TẬP ĐIỂM CẦN ĐẾN")
 
     selected_points = st.sidebar.multiselect(
-        "",
+        "Nhấp vào bên dưới để chọn tập điểm:",
         options=all_point_names,
         default=(
             all_point_names[:5]
