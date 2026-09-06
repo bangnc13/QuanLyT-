@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Trong Suốt & Nút bấm Blink Neon
+# CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt, Logo Trong Suốt & Nút bấm Neon Glow Pulse
 st.markdown(
     """
     <style>
@@ -124,30 +124,49 @@ st.markdown(
             font-weight: 500 !important;
         }
 
-        /* 5. TẠO HIỆU ỨNG BLINK (NHẤP NHÁY) CHO NÚT TỐI ƯU LỘ TRÌNH BÊN SIDEBAR */
-        @keyframes neon-blink {
+        /* ========================================================= */
+        /* 5. HIỆU ỨNG VIỀN NEON RỰC RỠ TỎA SÁNG CHO NÚT TỐI ƯU SIDEBAR */
+        /* ========================================================= */
+        @keyframes neon-border-pulse {
             0%, 100% {
                 background-color: #FF6600 !important;
-                box-shadow: 0 0 12px #FF6600, 0 0 24px rgba(255, 102, 0, 0.8) !important;
                 border-color: #FF9933 !important;
+                box-shadow: 0 0 10px #FF6600, 
+                            0 0 20px #FF6600, 
+                            0 0 35px rgba(255, 102, 0, 0.9), 
+                            inset 0 0 10px rgba(255, 255, 255, 0.4) !important;
                 transform: scale(1);
             }
             50% {
                 background-color: #FF3300 !important;
-                box-shadow: 0 0 22px #FF3300, 0 0 40px rgba(255, 51, 0, 1) !important;
-                border-color: #FFCC00 !important;
-                transform: scale(1.02);
+                border-color: #FFEE00 !important;
+                box-shadow: 0 0 15px #FF3300, 
+                            0 0 30px #FF3300, 
+                            0 0 50px rgba(255, 51, 0, 1), 
+                            0 0 12px #FFEE00,
+                            inset 0 0 15px rgba(255, 255, 255, 0.6) !important;
+                transform: scale(1.03);
             }
         }
 
         .blink-btn button {
-            animation: neon-blink 1.5s infinite ease-in-out !important;
+            animation: neon-border-pulse 1.6s infinite ease-in-out !important;
             color: #FFFFFF !important;
-            font-weight: bold !important;
-            border-radius: 20px !important;
+            font-weight: 800 !important;
+            font-size: 1rem !important;
+            border-radius: 25px !important;
             border: 2px solid #FF9933 !important;
             transition: all 0.3s ease !important;
             margin-bottom: 15px !important;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.5) !important;
+        }
+
+        .blink-btn button:hover {
+            animation: none !important;
+            background-color: #FF0000 !important;
+            border-color: #FFFFFF !important;
+            box-shadow: 0 0 25px #FF0000, 0 0 50px #FF0000, 0 0 75px #FF0000 !important;
+            transform: scale(1.05) !important;
         }
 
         .main .block-container, 
@@ -228,7 +247,7 @@ st.sidebar.markdown(
 if "trigger_optimize" not in st.session_state:
     st.session_state.trigger_optimize = False
 
-# 🔘 NÚT TỐI ƯU LỘ TRÌNH ĐẶT NGAY DƯỚI "Make by BangNC13" VỚI HIỆU ỨNG BLINK
+# 🔘 NÚT TỐI ƯU LỘ TRÌNH ĐẶT NGAY DƯỚI "Make by BangNC13" VỚI VIỀN NEON TỎA SÁNG
 st.sidebar.markdown('<div class="blink-btn">', unsafe_allow_html=True)
 if st.sidebar.button(
     "🚀 Tối ưu lộ trình di chuyển", type="primary", use_container_width=True
