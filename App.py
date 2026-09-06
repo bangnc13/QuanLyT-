@@ -16,7 +16,7 @@ st.markdown(
     """
     <style>
         /* ========================================================= */
-        /* 0. ẨN TẤT CẢ ICON THANH TRÊN (HEADER/GITHUB) VÀ THANH DƯỚI (FOOTER/WATERMARK) */
+        /* 0. ẨN TẤT CẢ ICON THANH TRÊN, FOOTER, TOOLBAR STREAMLIT */
         /* ========================================================= */
         header[data-testid="stHeader"],
         [data-testid="stHeader"],
@@ -331,10 +331,22 @@ if df is not None:
                 background: #e5e3df;
             }}
 
-            /* ẨN TOÀN BỘ CÁC BIỂU TƯỢNG VÀ NÚT Ở GÓC DƯỚI BÊN PHẢI BẢN ĐỒ */
-            .leaflet-bottom.leaflet-right {{
+            /* ========================================================= */
+            /* TRUY VẤN VÀ ẨN TRIỆT ĐỂ TẤT CẢ BIỂU TƯỢNG VÀ NÚT Ở GÓC DƯỚI BÊN PHẢI */
+            /* ========================================================= */
+            .leaflet-bottom.leaflet-right,
+            .leaflet-control-attribution,
+            .leaflet-control-layers,
+            .leaflet-control-layers-toggle,
+            .leaflet-control-layers-expanded,
+            div[class*="leaflet-bottom"][class*="leaflet-right"],
+            div[class*="leaflet-control-layers"] {{
                 display: none !important;
                 visibility: hidden !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+                width: 0 !important;
+                height: 0 !important;
             }}
 
             .user-location-marker {{
@@ -427,7 +439,7 @@ if df is not None:
             document.addEventListener("DOMContentLoaded", function() {{
                 var googleStreets = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}', {{
                     maxZoom: 20,
-                    attribution: 'Google Maps'
+                    attribution: ''
                 }});
 
                 var map = L.map('map', {{
