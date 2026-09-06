@@ -756,7 +756,7 @@ if df is not None:
                         }};
 
                         var btnToggleSidebar = L.DomUtil.create('div', 'leaflet-control-btn btn-green-neon', container);
-                        btnToggleSidebar.innerHTML = '👁️ Menu';
+                        btnToggleSidebar.innerHTML = 'Menu';
                         btnToggleSidebar.onclick = function() {{
                             var sidebarBtn = window.parent.document.querySelector('[data-testid="stSidebarCollapseButton"] button') ||
                                              window.parent.document.querySelector('button[aria-label="Close sidebar"]') ||
