@@ -94,7 +94,6 @@ def haversine_distance(coord1, coord2):
 
 # Thuật toán tìm đường đi tối ưu khứ hồi (TSP)
 def solve_tsp(start_coords, target_nodes, node_coords_dict):
-    # Lọc các node hợp lệ có tọa độ
     valid_targets = [n for n in target_nodes if n in node_coords_dict]
     if not valid_targets:
         return [], 0.0
@@ -102,7 +101,6 @@ def solve_tsp(start_coords, target_nodes, node_coords_dict):
     nodes = valid_targets.copy()
     num_nodes = len(nodes)
     
-    # Nếu số lượng điểm nhỏ (<= 9), giải chính xác bằng hoán vị
     if num_nodes <= 9:
         best_path = None
         min_dist = float('inf')
@@ -117,7 +115,6 @@ def solve_tsp(start_coords, target_nodes, node_coords_dict):
                 best_path = list(perm)
         return best_path, min_dist
     else:
-        # Sử dụng giải thuật Lân cận gần nhất (Nearest Neighbor) cho tập điểm lớn hơn
         unvisited = nodes.copy()
         current_coord = start_coords
         path = []
@@ -491,9 +488,13 @@ if df is not None:
             .leaflet-control-btn:hover {{
                 background-color: #f4f4f4;
             }}
-            .leaflet-routing-container {{
+            
+            /* Ẩn hoàn toàn bảng chỉ đường và ghi chú lộ trình chi tiết trên màn hình nhỏ */
+            .leaflet-routing-container, 
+            .leaflet-routing-error {{
                 display: none !important;
             }}
+
             .leaflet-bottom {{
                 margin-bottom: 10px;
             }}
@@ -595,6 +596,7 @@ if df is not None:
                 map.locate({{ watch: true, setView: false, enableHighAccuracy: true }});
 
                 var routingControl = null;
+                var tspMarkersLayer = L.layerGroup().addTo(map);
 
                 // Hàm tính toán khoảng cách Haversine trên JS
                 function getHaversineDist(c1, c2) {{
@@ -622,7 +624,9 @@ if df is not None:
                         return;
                     }}
 
-                    // Thuật toán Lân cận gần nhất (Nearest Neighbor) giải TSP từ điểm GPS xuất phát
+                    // Xóa các Marker đánh số cũ nếu có
+                    tspMarkersLayer.clearLayers();
+
                     var unvisited = nodeNames.slice();
                     var routeWaypoints = [userLatLng];
                     var orderedNodes = [];
@@ -654,31 +658,31 @@ if df is not None:
                     // Quay về điểm GPS ban đầu
                     routeWaypoints.push(userLatLng);
 
-                    // Hiển thị các marker đánh số thứ tự di chuyển
+                    // Đánh số thứ tự di chuyển gọn gàng trên bản đồ
                     orderedNodes.forEach(function(nodeName, index) {{
                         var coord = targetsDict[nodeName];
                         var numberIcon = L.divIcon({{
                             className: 'tsp-node-marker',
                             html: (index + 1).toString()
                         }});
-                        L.marker(coord, {{ icon: numberIcon }}).addTo(map)
-                            .bindPopup("<b>Điểm " + (index + 1) + ":</b> " + nodeName);
+                        L.marker(coord, {{ icon: numberIcon }}).addTo(tspMarkersLayer);
                     }});
 
-                    // Vẽ đường nối lộ trình di chuyển
+                    // Vẽ đường nối lộ trình di chuyển (Tắt bảng điều hướng chi tiết)
                     if (routingControl) map.removeControl(routingControl);
 
                     routingControl = L.Routing.control({{
                         waypoints: routeWaypoints,
                         routeWhileDragging: false,
                         addWaypoints: false,
-                        show: false,
+                        show: false, // Không hiện bảng danh sách từng bước
+                        createMarker: function() {{ return null; }}, // Không tạo thêm marker chỉ đường mặc định
                         lineOptions: {{
-                            styles: [{{ color: '#8B5CF6', opacity: 0.9, weight: 6 }}]
+                            styles: [{{ color: '#8B5CF6', opacity: 0.9, weight: 5 }}]
                         }}
                     }}).addTo(map);
 
-                    alert("Đã tạo lộ trình tối ưu đi qua " + orderedNodes.length + " điểm và quay lại vị trí GPS ban đầu!");
+                    alert("Đã tạo lộ trình tối ưu qua " + orderedNodes.length + " điểm!");
                 }}
 
                 function drawRouteToDestination() {{
@@ -705,7 +709,8 @@ if df is not None:
                         waypoints: [userLatLng, destLatLng],
                         routeWhileDragging: false,
                         addWaypoints: false,
-                        show: false,
+                        show: false, // Tắt bảng hiển thị các bước rẽ
+                        createMarker: function() {{ return null; }},
                         lineOptions: {{
                             styles: [{{ color: '#059669', opacity: 0.8, weight: 6 }}]
                         }}
