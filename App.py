@@ -308,6 +308,58 @@ with st.sidebar:
     
     st.markdown("<div class='hud-label'>📡 Trạng thái định vị GPS REALTIME:</div>", unsafe_allow_html=True)
     
+    # Nút bấm HTML/JS kích hoạt định vị GPS chủ động từ thiết bị
+    components.html("""
+    <style>
+        .gps-btn {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            color: #00f0ff;
+            background: rgba(0, 240, 255, 0.1);
+            border: 1px solid #00f0ff;
+            border-radius: 4px;
+            padding: 8px 12px;
+            width: 100%;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+            margin-top: 5px;
+        }
+        .gps-btn:hover {
+            background: #00f0ff;
+            color: #000000;
+            box-shadow: 0 0 20px #00f0ff;
+        }
+    </style>
+    <button class="gps-btn" onclick="getLocation()">📍 LẤY VỊ TRÍ GPS HIỆN TẠI</button>
+
+    <script>
+    function getLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition((position) => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                const parentWindow = window.parent;
+                const currentUrl = new URL(parentWindow.location.href);
+                currentUrl.searchParams.set('lat', lat);
+                currentUrl.searchParams.set('lon', lon);
+                parentWindow.location.href = currentUrl.toString();
+            }, (error) => {
+                alert("Không thể lấy tọa độ GPS! Hãy cấp quyền vị trí cho trình duyệt.");
+            }, {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            });
+        } else {
+            alert("Trình duyệt không hỗ trợ Geolocation.");
+        }
+    }
+    </script>
+    """, height=50)
+
     if st.session_state.current_loc:
         lat, lon = st.session_state.current_loc
         st.markdown(f"""
@@ -317,7 +369,7 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
     else:
-        st.info("Đang kết nối tín hiệu GPS Realtime...")
+        st.info("Nhấn nút trên để lấy tọa độ hoặc chờ kết nối GPS...")
 
     st.divider()
 
