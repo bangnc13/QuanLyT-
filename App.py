@@ -515,7 +515,7 @@ if df is not None:
 
                         // Nút 3: Bo tròn Màu Xanh Neon Ẩn/Hiện Sidebar
                         var btnToggleSidebar = L.DomUtil.create('div', 'leaflet-control-btn btn-neon', container);
-                        btnToggleSidebar.innerHTML = '👁️ Ẩn/Hiện Sidebar';
+                        btnToggleSidebar.innerHTML = '👁️ Menu';
                         btnToggleSidebar.onclick = function() {{
                             var sidebarBtn = window.parent.document.querySelector('[data-testid="stSidebarCollapseButton"] button') ||
                                              window.parent.document.querySelector('button[aria-label="Close sidebar"]') ||
