@@ -98,7 +98,7 @@ def load_excel_data():
 
 df, file_name = load_excel_data() 
 
-st.sidebar.markdown('<div class="sidebar-title">Tối Ưu Lộ Trình</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="sidebar-title">TQG - Thu cước </div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="sidebar-subtitle">Tối ưu quãng đường thu cước - Make by BangNC13 </div>', unsafe_allow_html=True)
 
 # Khởi tạo session state kích hoạt tối ưu từ sidebar
