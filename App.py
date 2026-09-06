@@ -1,684 +1,428 @@
-import streamlit as st
+import os
+import json
+import math
 import pandas as pd
-import requests
-import folium
+import streamlit as st
 import streamlit.components.v1 as components
-from streamlit_folium import st_folium
 
-# ================= 1. CẤU HÌNH TRANG =================
+# 1. Cấu hình trang Streamlit
 st.set_page_config(
-    page_title="Hệ Thống Tối Ưu Lộ Trình - Robotic UI",
-    page_icon="🤖",
-    layout="wide",
+    page_title="Tối Ưu Lộ Trình Di Chuyển Tập Điểm", 
+    layout="wide", 
     initial_sidebar_state="expanded"
 )
 
-# ================= 2. INJECT CSS CUSTOM UI =================
+# CSS Tùy chỉnh giao diện Fullscreen & Sidebar (Kế thừa từ app.py cũ)
 st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
+    <style>
+        html, body, [data-testid="stAppViewContainer"], .main, .stApp {
+            margin: 0 !important;
+            padding: 0 !important;
+            height: 100vh !important;
+            overflow: hidden !important;
+        }
 
-    .block-container {
-        padding: 0rem !important;
-        max-width: 100% !important;
-    }
+        section[data-testid="stSidebar"] {
+            z-index: 999999 !important;
+        }
+        section[data-testid="stSidebar"] > div:first-child {
+            padding-top: 1.5rem !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+        }
 
-    .stApp {
-        background-color: #1a0a00 !important;
-    }
+        .sidebar-title {
+            font-size: 1.15rem !important;
+            font-weight: 700 !important;
+            color: #1F2937 !important;
+            margin-bottom: 2px !important;
+        }
+        .sidebar-subtitle {
+            font-size: 0.8rem !important;
+            color: #6B7280 !important;
+            margin-bottom: 12px !important;
+        }
 
-    html, body, .stMarkdown, p, label {
-        color: #ffffff !important;
-    }
+        header[data-testid="stHeader"] {
+            background: transparent !important;
+            height: 0px !important;
+            z-index: 999999 !important;
+        }
 
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #331400 0%, #1f0c00 100%) !important;
-        border-right: 2px solid #ff6600 !important;
-        box-shadow: 5px 0px 15px rgba(255, 102, 0, 0.4) !important;
-    }
+        .main .block-container, 
+        [data-testid="stMainBlockContainer"],
+        [data-testid="stVerticalBlock"],
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            padding: 0 !important;
+            margin: 0 !important;
+            gap: 0rem !important;
+            max-width: 100vw !important;
+            height: 100vh !important;
+        }
 
-    header[data-testid="stHeader"] {
-        background-color: transparent !important;
-        background: transparent !important;
-        z-index: 1 !important;
-    }
-
-    header[data-testid="stHeader"] * {
-        color: #ffffff !important;
-        fill: #ffffff !important;
-    }
-
-    /* ẨN FOOTER STREAMLIT */
-    footer {
-        visibility: hidden !important;
-        height: 0px !important;
-    }
-
-    iframe {
-        background-color: transparent !important;
-    }
-    
-    [data-element-container="true"] {
-        background-color: transparent !important;
-    }
-
-    .stMainBlockContainer, [data-testid="stMainBlockContainer"] {
-        background-color: transparent !important;
-    }
-
-    .robot-title {
-        font-family: 'Orbitron', sans-serif;
-        color: #00f0ff !important;
-        text-align: center;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-        text-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
-        margin-top: 15px;
-        margin-bottom: 20px;
-    }
-
-    div.stButton > button {
-        font-family: 'Orbitron', sans-serif !important;
-        font-weight: 700 !important;
-        color: #000000 !important;
-        background: linear-gradient(135deg, #00f0ff 0%, #7000ff 100%) !important;
-        border: none !important;
-        border-radius: 4px !important;
-        padding: 12px 24px !important;
-        text-transform: uppercase !important;
-        letter-spacing: 1.5px !important;
-        clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%);
-        transition: all 0.3s ease-in-out !important;
-        box-shadow: 0 0 15px rgba(0, 240, 255, 0.4) !important;
-    }
-
-    div.stButton > button:hover {
-        transform: scale(1.03) translateY(-2px) !important;
-        box-shadow: 0 0 25px rgba(0, 240, 255, 0.8), 0 0 10px rgba(112, 0, 255, 0.8) !important;
-        color: #ffffff !important;
-    }
-
-    .hud-card {
-        background: rgba(51, 20, 0, 0.85) !important;
-        border: 1px solid #ff6600 !important;
-        border-left: 4px solid #00f0ff !important;
-        border-radius: 6px;
-        padding: 12px;
-        margin-top: 10px;
-        box-shadow: inset 0 0 10px rgba(255, 102, 0, 0.2);
-        font-family: 'Rajdhani', sans-serif;
-    }
-
-    .hud-label {
-        color: #ffffff !important;
-        font-size: 0.85rem;
-        text-transform: uppercase;
-    }
-
-    .hud-value {
-        color: #00f0ff !important;
-        font-size: 1.1rem;
-        font-weight: bold;
-        font-family: 'Orbitron', sans-serif;
-    }
-
-    hr {
-        border-color: #ff6600 !important;
-        opacity: 0.5;
-    }
-
-    /* MULTISELECT UI FIX */
-    [data-baseweb="select"] > div {
-        background-color: #1f0c00 !important;
-        border: 1px solid #ff6600 !important;
-        color: #00f0ff !important;
-    }
-
-    [data-baseweb="select"] div[role="button"],
-    [data-baseweb="select"] input,
-    [data-baseweb="select"] input::placeholder {
-        color: #00f0ff !important;
-        -webkit-text-fill-color: #00f0ff !important;
-    }
-
-    span[data-baseweb="tag"] {
-        background-color: rgba(0, 240, 255, 0.2) !important;
-        border: 1px solid #00f0ff !important;
-    }
-
-    span[data-baseweb="tag"] * {
-        color: #00f0ff !important;
-        font-weight: bold !important;
-    }
-
-    ul[role="listbox"] {
-        background-color: #1f0c00 !important;
-        border: 1px solid #00f0ff !important;
-    }
-
-    li[role="option"] span, li[role="option"] div {
-        color: #00f0ff !important;
-    }
-
-    li[role="option"]:hover {
-        background-color: rgba(0, 240, 255, 0.2) !important;
-    }
-
-    /* NÚT COLLAPSE/EXPAND SIDEBAR NEON XANH */
-    [data-testid="stSidebarCollapseButton"] button,
-    [data-testid="stSidebarExpandButton"] button {
-        background-color: #1f0c00 !important;
-        border: 2px solid #00f0ff !important;
-        border-radius: 50% !important;
-        color: #00f0ff !important;
-        box-shadow: 0 0 10px rgba(0, 240, 255, 0.6), inset 0 0 5px rgba(0, 240, 255, 0.4) !important;
-        transition: all 0.3s ease-in-out !important;
-        width: 40px !important;
-        height: 40px !important;
-        padding: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }
-
-    [data-testid="stSidebarCollapseButton"] button svg,
-    [data-testid="stSidebarExpandButton"] button svg {
-        fill: #00f0ff !important;
-        color: #00f0ff !important;
-    }
-
-    [data-testid="stSidebarCollapseButton"] button:hover,
-    [data-testid="stSidebarExpandButton"] button:hover {
-        background-color: #00f0ff !important;
-        box-shadow: 0 0 20px #00f0ff, 0 0 35px #00f0ff !important;
-        transform: scale(1.1) !important;
-    }
-
-    [data-testid="stSidebarCollapseButton"] button:hover svg,
-    [data-testid="stSidebarExpandButton"] button:hover svg {
-        fill: #000000 !important;
-        color: #000000 !important;
-    }
-
-    /* ẨN NÚT ZOOM (+/-) */
-    .leaflet-control-zoom {
-        display: none !important;
-    }
-</style>
+        iframe {
+            width: 100vw !important;
+            height: 100vh !important;
+            border: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            display: block !important;
+        }
+    </style>
 """, unsafe_allow_html=True)
 
-# ================= 3. HÀM NẠP DỮ LIỆU EXCEL =================
-@st.cache_data
-def load_data(file_path):
-    try:
-        df = pd.read_excel(file_path)
-        df = df.dropna(subset=['Latitude', 'Longitude'])
-        return df
-    except Exception:
-        return pd.DataFrame()
-
-# ================= 4. THUẬT TOÁN TỐI ƯU LỘ TRÌNH VÒNG KÍN =================
-def get_optimized_route_roundtrip(origin, points_list):
-    all_points = [{'Name': 'GPS ORIGIN', 'Latitude': origin[0], 'Longitude': origin[1]}] + points_list
+# 2. Đọc file Excel dữ liệu điểm
+@st.cache_data 
+def load_excel_data(): 
+    possible_files = [ 
+        "QuanLyTĐ.xlsx",
+        "QuanLyTD.xlsx",
+        "Danh-Sách-Đoạn-Cáp.xlsx",  
+        "data.xlsx" 
+    ] 
     
-    coords_str = ";".join([f"{pt['Longitude']},{pt['Latitude']}" for pt in all_points])
-    table_url = f"http://router.project-osrm.org/table/v1/driving/{coords_str}?annotations=duration,distance"
+    selected_file = None 
+    for f in possible_files: 
+        if os.path.exists(f): 
+            selected_file = f 
+            break 
+
+    if not selected_file: 
+        files = [f for f in os.listdir(".") if f.endswith(".xlsx") or f.endswith(".xls")] 
+        if files: 
+            selected_file = files[0] 
+
+    if selected_file: 
+        df = pd.read_excel(selected_file) 
+        return df, selected_file 
+    return None, None 
+
+df, file_name = load_excel_data() 
+
+st.sidebar.markdown('<div class="sidebar-title">🗺️ TỐI ƯU LỘ TRÌNH TẬP ĐIỂM</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="sidebar-subtitle">Định vị GPS Realtime & Tối ưu lộ trình đi qua các điểm</div>', unsafe_allow_html=True)
+
+if df is not None: 
+    df.columns = [str(col).strip() for col in df.columns] 
     
-    try:
-        res = requests.get(table_url, timeout=5).json()
-        if res.get('code') != 'Ok':
-            return None, [], 0, 0
-            
-        durations = res['durations']
-        
-        unvisited = list(range(1, len(all_points)))
-        current_idx = 0
-        ordered_indices = []
-        
-        while unvisited:
-            next_idx = min(unvisited, key=lambda x: durations[current_idx][x])
-            ordered_indices.append(next_idx)
-            unvisited.remove(next_idx)
-            current_idx = next_idx
+    # Tìm tự động các cột Tên điểm, Vĩ độ (Lat), Kinh độ (Lng)
+    name_col = next((c for c in df.columns if any(k in c.lower() for k in ['tên', 'điểm', 'kn', 'station', 'name'])), df.columns[0])
+    lat_col = next((c for c in df.columns if any(k in c.lower() for k in ['lat', 'vĩ độ', 'vi do'])), None) 
+    lon_col = next((c for c in df.columns if any(k in c.lower() for k in ['lng', 'lon', 'kinh độ', 'kinh do'])), None) 
 
-        ordered_points = []
-        route_coords_str = f"{origin[1]},{origin[0]}"
-        
-        for order, idx in enumerate(ordered_indices, 1):
-            pt = all_points[idx]
-            ordered_points.append({
-                'Name': pt['Tên đối tượng'],
-                'Latitude': pt['Latitude'],
-                'Longitude': pt['Longitude'],
-                'Order': order
-            })
-            route_coords_str += f";{pt['Longitude']},{pt['Latitude']}"
-
-        route_coords_str += f";{origin[1]},{origin[0]}"
-
-        route_url = f"http://router.project-osrm.org/route/v1/driving/{route_coords_str}?overview=full&geometries=geojson"
-        route_res = requests.get(route_url, timeout=5).json()
-        
-        if route_res.get('code') == 'Ok':
-            route_data = route_res['routes'][0]
-            route_coords = [(lat, lon) for lon, lat in route_data['geometry']['coordinates']]
-            dist_km = route_data['distance'] / 1000.0
-            dur_min = route_data['duration'] / 60.0
-            return route_coords, ordered_points, dist_km, dur_min
-
-    except Exception as e:
-        st.error(f"Lỗi tính toán lộ trình: {e}")
-        
-    return None, [], 0, 0
-
-# Khởi tạo dữ liệu
-df = load_data('QuanLyTĐ.xlsx')
-
-if df.empty:
-    df = pd.DataFrame({
-        'Tên đối tượng': ['Điểm A', 'Điểm B', 'Điểm C'],
-        'Latitude': [21.0285, 21.0350, 21.0200],
-        'Longitude': [105.8542, 105.8400, 105.8600]
-    })
-
-if 'current_loc' not in st.session_state:
-    st.session_state.current_loc = None
-if 'route_coords' not in st.session_state:
-    st.session_state.route_coords = None
-if 'ordered_points' not in st.session_state:
-    st.session_state.ordered_points = []
-if 'route_summary' not in st.session_state:
-    st.session_state.route_summary = None
-
-# Bắt tọa độ ban đầu từ URL nếu có
-realtime_lat = st.query_params.get("lat")
-realtime_lon = st.query_params.get("lon")
-if realtime_lat and realtime_lon:
-    try:
-        st.session_state.current_loc = (float(realtime_lat), float(realtime_lon))
-    except ValueError:
-        pass
-
-# ================= SIDEBAR =================
-with st.sidebar:
-    st.markdown("<h2 class='robot-title'>🤖 Make By BangNC13</h2>", unsafe_allow_html=True)
-    
-    options = df['Tên đối tượng'].tolist()
-    selected_names = st.multiselect(
-        "🎯 Chọn danh sách tập điểm cần đi (Tối đa 15):",
-        options=options,
-        max_selections=15,
-        placeholder="Choose options"
-    )
-    
-    st.divider()
-    
-    st.markdown("<div class='hud-label'>📡 Trạng thái định vị GPS REALTIME:</div>", unsafe_allow_html=True)
-    
-    # Hiển thị HUD dynamic realtime qua HTML container để JS cập nhật trực tiếp
-    st.markdown("""
-    <div class='hud-card'>
-        <div class='hud-label'>Tọa độ Realtime</div>
-        <div class='hud-value' id='hud-gps-display'>Đang tìm tín hiệu...</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.divider()
-
-    if st.button("⚡ Bấm xem lộ trình ⚡", use_container_width=True):
-        if not st.session_state.current_loc:
-            st.error("Chưa nhận diện được GPS!")
-        elif not selected_names:
-            st.error("Chưa chọn mục tiêu!")
-        else:
-            selected_df = df[df['Tên đối tượng'].isin(selected_names)]
-            points_list = selected_df.to_dict('records')
-            
-            with st.spinner("🤖 Đang tối ưu hóa lộ trình vòng kín..."):
-                route_coords, ordered_points, dist_km, dur_min = get_optimized_route_roundtrip(
-                    st.session_state.current_loc, points_list
-                )
-                
-                if route_coords:
-                    st.session_state.route_coords = route_coords
-                    st.session_state.ordered_points = ordered_points
-                    st.session_state.route_summary = {
-                        'distance': dist_km,
-                        'duration': dur_min
+    # Nếu file theo định dạng kết nối 2 đầu (VD: Lat1, Lng1, Lat2, Lng2)
+    points_dict = {}
+    if lat_col and lon_col:
+        for _, row in df.iterrows():
+            p_name = str(row[name_col]).strip()
+            try:
+                if pd.notnull(row[lat_col]) and pd.notnull(row[lon_col]):
+                    points_dict[p_name] = {
+                        "lat": float(row[lat_col]),
+                        "lng": float(row[lon_col])
                     }
-
-    if st.session_state.route_summary:
-        st.divider()
-        st.markdown(f"""
-        <div class='hud-card'>
-            <div class='hud-label'>Tổng quãng đường (Vòng kín)</div>
-            <div class='hud-value'>{st.session_state.route_summary['distance']:.2f} KM</div>
-            <div class='hud-label' style='margin-top:8px;'>Thời gian di chuyển</div>
-            <div class='hud-value'>{st.session_state.route_summary['duration']:.0f} PHÚT</div>
-        </div>
-        """, unsafe_allow_html=True)
+            except Exception:
+                pass
+    else:
+        # Trường hợp tìm cột Lat1/Lng1/Lat2/Lng2
+        lat_col1 = next((c for c in df.columns if 'lat' in c.lower() and '1' in c.lower()), None) 
+        lon_col1 = next((c for c in df.columns if ('lng' in c.lower() or 'lon' in c.lower()) and '1' in c.lower()), None)
+        k1_col = next((c for c in df.columns if 'kn1' in c.lower() or 'điểm 1' in c.lower()), name_col)
         
-        st.markdown("<br><b style='color:#ffffff;'>📍 Lộ trình thực thi:</b>", unsafe_allow_html=True)
-        st.markdown("<span style='color:#00f0ff;'>[0] Vị trí xuất phát (GPS CORE)</span>", unsafe_allow_html=True)
-        for pt in st.session_state.ordered_points:
-            st.markdown(f"<span style='color:#00f0ff;'>[{pt['Order']}]</span> <span style='color:#ffffff;'>{pt['Name']}</span>", unsafe_allow_html=True)
-        st.markdown(f"<span style='color:#00f0ff;'>[{len(st.session_state.ordered_points)+1}]</span> <span style='color:#ffffff;'>Quay về vị trí xuất phát</span>", unsafe_allow_html=True)
+        if lat_col1 and lon_col1:
+            for _, row in df.iterrows():
+                p_name = str(row[k1_col]).strip()
+                try:
+                    if pd.notnull(row[lat_col1]) and pd.notnull(row[lon_col1]):
+                        points_dict[p_name] = {
+                            "lat": float(row[lat_col1]),
+                            "lng": float(row[lon_col1])
+                        }
+                except Exception:
+                    pass
 
-# ================= MAIN CONTENT MAP =================
-map_center = st.session_state.current_loc if st.session_state.current_loc else [df['Latitude'].mean(), df['Longitude'].mean()]
+    # Lọc danh sách điểm cần đi
+    all_point_names = sorted(list(points_dict.keys()))
+    
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📍 CHỌN CÁC TẬP ĐIỂM CẦN ĐẾN")
+    
+    selected_points = st.sidebar.multiselect(
+        "Chọn các điểm cần đi qua:",
+        options=all_point_names,
+        default=all_point_names[:5] if len(all_point_names) >= 5 else all_point_names,
+        help="Thứ tự tối ưu sẽ được tự động tính toán dựa theo vị trí GPS xuất phát của bạn."
+    )
 
-m = folium.Map(
-    location=map_center, 
-    zoom_start=16, 
-    tiles=None,
-    zoom_control=False
-)
+    selected_data = []
+    for p in selected_points:
+        selected_data.append({
+            "name": p,
+            "lat": points_dict[p]["lat"],
+            "lng": points_dict[p]["lng"]
+        })
 
-# LAYER 1: Google Street
-folium.TileLayer(
-    tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-    attr='Google Maps',
-    name='Google Street (Đường phố)',
-    overlay=False,
-    control=True,
-    show=True
-).add_to(m)
+    st.sidebar.info(f"Đã chọn **{len(selected_data)}** tập điểm.")
 
-# LAYER 2: Google Satellite
-folium.TileLayer(
-    tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-    attr='Google Satellite',
-    name='Google Satellite (Vệ tinh)',
-    overlay=False,
-    control=True,
-    show=False
-).add_to(m)
+    # Tọa độ mặc định hiển thị bản đồ
+    map_center = [21.0285, 105.8542]
+    if len(selected_data) > 0:
+        map_center = [selected_data[0]["lat"], selected_data[0]["lng"]]
 
-folium.LayerControl(position='topright').add_to(m)
+    # Giao diện Leaflet tích hợp GPS + Tối ưu lộ trình qua JavaScript
+    leaflet_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        <!-- Leaflet CSS & JS -->
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-# MarkerGPS động siêu tốc xử lý thuần bằng Leaflet JS
-gps_marker_js = folium.Element("""
-<script>
-    var userGpsMarker = null;
-    var userMapInstance = null;
+        <!-- Leaflet Routing Machine CSS & JS -->
+        <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+        <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
-    function getLeafletMap() {
-        for (var key in window) {
-            if (key.startsWith('map_') && window[key] instanceof L.Map) {
-                return window[key];
-            }
-        }
-        return null;
-    }
+        <style>
+            html, body {{
+                width: 100%;
+                height: 100vh;
+                margin: 0;
+                padding: 0;
+                overflow: hidden;
+            }}
+            #map {{
+                width: 100%;
+                height: 100vh;
+                background: #e5e3df;
+            }}
+            .user-location-marker {{
+                background-color: #2563EB;
+                border: 3px solid #FFFFFF;
+                border-radius: 50%;
+                width: 20px !important;
+                height: 20px !important;
+                margin-left: -10px !important;
+                margin-top: -10px !important;
+                box-shadow: 0 0 10px rgba(37, 99, 235, 0.8);
+            }}
+            .leaflet-control-btn {{
+                background-color: #ffffff;
+                border: 2px solid rgba(0,0,0,0.2);
+                border-radius: 6px;
+                padding: 6px 12px;
+                cursor: pointer;
+                font-size: 13px;
+                font-weight: bold;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }}
+            .leaflet-control-btn:hover {{
+                background-color: #f4f4f4;
+            }}
+            .leaflet-routing-container {{
+                background: white !important;
+                padding: 10px !important;
+                border-radius: 8px !important;
+                max-height: 280px !important;
+                overflow-y: auto !important;
+                font-size: 12px !important;
+            }}
+            .leaflet-bottom {{
+                margin-bottom: 10px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div id="map"></div>
+        <script>
+            document.addEventListener("DOMContentLoaded", function() {{
+                // 1. Google Maps Tiles
+                var googleStreets = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}', {{
+                    maxZoom: 20,
+                    attribution: 'Google Maps'
+                }});
 
-    function updateGpsMarkerDirectly(lat, lon) {
-        if (!userMapInstance) {
-            userMapInstance = getLeafletMap();
-        }
-        if (!userMapInstance) return;
+                var googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s,h&x={{x}}&y={{y}}&z={{z}}', {{
+                    maxZoom: 20,
+                    attribution: 'Google Maps Satellite'
+                }});
 
-        var iconHtml = `
-            <div id="user-heading-arrow" style="
-                width: 42px; 
-                height: 42px; 
-                display: flex; 
-                justify-content: center; 
-                align-items: center; 
-                transition: transform 0.1s linear; 
-                transform-origin: center center;
-            ">
-                <svg width="42" height="42" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 0px 8px #00f0ff);">
-                    <path d="M12 2L4.5 20.29 5.21 21 12 18 18.79 21 19.5 20.29 12 2Z" fill="#00F0FF" stroke="#FFFFFF" stroke-width="1.5" stroke-linejoin="round"/>
-                </svg>
-            </div>
-        `;
+                var map = L.map('map', {{
+                    zoomControl: false,
+                    attributionControl: false,
+                    layers: [googleStreets]
+                }}).setView({json.dumps(map_center)}, 14);
 
-        var customIcon = L.divIcon({
-            html: iconHtml,
-            iconSize: [42, 42],
-            iconAnchor: [21, 21],
-            className: ''
-        });
+                // Control vị trí zoom & layer
+                L.control.zoom({{ position: 'bottomleft' }}).addTo(map);
+                L.control.layers({{ "🗺️ Đường phố": googleStreets, "🛰️ Vệ tinh": googleSat }}, null, {{ position: 'bottomright' }}).addTo(map);
 
-        if (userGpsMarker) {
-            userGpsMarker.setLatLng([lat, lon]);
-        } else {
-            userGpsMarker = L.marker([lat, lon], {icon: customIcon}).addTo(userMapInstance);
-            userMapInstance.setView([lat, lon], 16);
-        }
-    }
-</script>
-""")
-m.get_root().html.add_child(gps_marker_js)
+                // Danh sách điểm từ Excel đã chọn
+                var targets = {json.dumps(selected_data)};
 
-if st.session_state.ordered_points:
-    for pt in st.session_state.ordered_points:
-        folium.Marker(
-            location=(pt['Latitude'], pt['Longitude']),
-            popup=f"<b>Điểm {pt['Order']}: {pt['Name']}</b>",
-            tooltip=f"TARGET [{pt['Order']}]: {pt['Name']}",
-            icon=folium.DivIcon(
-                html=f"""<div style="
-                    background: linear-gradient(135deg, #00f0ff 0%, #7000ff 100%);
-                    color: white;
-                    border-radius: 50%;
-                    width: 30px;
-                    height: 30px;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    font-weight: 900;
-                    font-family: 'Orbitron', sans-serif;
-                    border: 2px solid #ffffff;
-                    box-shadow: 0 0 10px rgba(0, 240, 255, 0.9);
-                ">{pt['Order']}</div>"""
-            )
-        ).add_to(m)
+                // Hiển thị Marker các tập điểm
+                targets.forEach(function(pt, idx) {{
+                    var marker = L.circleMarker([pt.lat, pt.lng], {{
+                        radius: 7,
+                        color: '#EF4444',
+                        fillColor: '#FFFFFF',
+                        fillOpacity: 0.9,
+                        weight: 3
+                    }}).addTo(map);
+                    marker.bindPopup("<b>Tập điểm:</b> " + pt.name);
+                    marker.bindTooltip(pt.name, {{ permanent: false, direction: 'top' }});
+                }});
 
-if st.session_state.route_coords:
-    folium.PolyLine(
-        st.session_state.route_coords,
-        color="#00F0FF",
-        weight=5,
-        opacity=0.9,
-        tooltip="Cyber Round-Trip Route"
-    ).add_to(m)
+                // Định vị GPS Realtime người dùng
+                var userLatLng = null;
+                var userMarker = null;
+                var accuracyCircle = null;
 
-# FLOATING ACTION BUTTON GPS
-gps_button_element = folium.Element("""
-<style>
-    .leaflet-gps-fab {
-        position: fixed !important;
-        top: 25px !important;
-        left: 25px !important;
-        z-index: 999999 !important;
-        width: 48px;
-        height: 48px;
-        background: rgba(31, 12, 0, 0.95);
-        border: 2px solid #00f0ff;
-        border-radius: 50%;
-        color: #00f0ff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        box-shadow: 0 0 15px rgba(0, 240, 255, 0.7), inset 0 0 10px rgba(0, 240, 255, 0.3);
-        transition: all 0.2s ease;
-    }
-    .leaflet-gps-fab:hover {
-        transform: scale(1.15);
-        background: #00f0ff;
-        color: #000000;
-        box-shadow: 0 0 25px #00f0ff;
-    }
-</style>
+                function onLocationFound(e) {{
+                    userLatLng = e.latlng;
+                    var radius = e.accuracy / 2;
 
-<div class="leaflet-gps-fab" id="map-gps-btn" title="Cập nhật vị trí Tức Thời">
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"></circle>
-        <path d="M12 2v3m0 14v3M2 12h3m14 0h3"></path>
-    </svg>
-</div>
+                    if (userMarker) {{
+                        userMarker.setLatLng(e.latlng);
+                        accuracyCircle.setLatLng(e.latlng).setRadius(radius);
+                    }} else {{
+                        var userIcon = L.divIcon({{ className: 'user-location-marker' }});
+                        userMarker = L.marker(e.latlng, {{ icon: userIcon }}).addTo(map)
+                            .bindPopup("<b>Vị trí xuất phát của bạn (GPS)</b>");
+                        accuracyCircle = L.circle(e.latlng, radius, {{
+                            color: '#2563EB',
+                            fillColor: '#3B82F6',
+                            fillOpacity: 0.15,
+                            weight: 1
+                        }}).addTo(map);
+                    }}
+                }}
 
-<script>
-    (function initGpsBtnPure() {
-        var gpsBtn = document.getElementById('map-gps-btn');
-        if (gpsBtn) {
-            gpsBtn.onclick = function(e) {
-                e.stopPropagation();
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                        function(position) {
-                            var lat = position.coords.latitude;
-                            var lon = position.coords.longitude;
-                            
-                            // Cập nhật ngay lập tức không thông qua Streamlit Reload
-                            if (typeof updateGpsMarkerDirectly === 'function') {
-                                updateGpsMarkerDirectly(lat, lon);
-                            }
-                            
-                            window.parent.postMessage({
-                                type: 'INSTANT_GPS_SET',
-                                lat: lat,
-                                lon: lon
-                            }, '*');
-                        },
-                        function(error) {
-                            alert("Hãy bật GPS định vị trên điện thoại!");
-                        },
-                        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-                    );
-                }
-            };
-        } else {
-            setTimeout(initGpsBtnPure, 50);
-        }
-    })();
-</script>
-""")
-m.get_root().html.add_child(gps_button_element)
+                map.on('locationfound', onLocationFound);
+                map.on('locationerror', function(e) {{
+                    console.log("GPS Error: " + e.message);
+                }});
+                map.locate({{ watch: true, setView: false, enableHighAccuracy: true }});
 
-# Đóng sidebar khi bấm bản đồ
-map_click_js = folium.Element("""
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var mapContainer = document.querySelector('.folium-map');
-        if (mapContainer) {
-            mapContainer.addEventListener('click', function() {
-                try {
-                    window.parent.postMessage({type: 'CLOSE_STREAMLIT_SIDEBAR'}, '*');
-                } catch(e) {}
-            });
-            mapContainer.addEventListener('touchstart', function() {
-                try {
-                    window.parent.postMessage({type: 'CLOSE_STREAMLIT_SIDEBAR'}, '*');
-                } catch(e) {}
-            });
-        }
-    });
-</script>
-""")
-m.get_root().html.add_child(map_click_js)
+                // Thuật toán Haversine tính khoảng cách giữa 2 điểm
+                function getDistance(lat1, lon1, lat2, lon2) {{
+                    var R = 6371; // km
+                    var dLat = (lat2 - lat1) * Math.PI / 180;
+                    var dLon = (lon2 - lon1) * Math.PI / 180;
+                    var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                            Math.sin(dLon/2) * Math.sin(dLon/2);
+                    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                    return R * c;
+                }}
 
-st_folium(m, use_container_width=True, height=1000)
+                // Thuật toán TSP Nearest Neighbor: Xuất phát từ GPS -> Đi qua hết các tập điểm -> Quay về GPS
+                function solveTSP(startPt, pts) {{
+                    var unvisited = pts.slice();
+                    var route = [startPt];
+                    var current = startPt;
 
-# ================= 5. ENGINE ĐỊNH VỊ PURE JAVASCRIPT TRỰC TIẾP DOWNTIME 0MS =================
-components.html("""
-<script>
-    window.addEventListener('message', function(event) {
-        if (!event.data) return;
+                    while (unvisited.length > 0) {{
+                        var nearestIdx = 0;
+                        var minDst = Infinity;
 
-        if (event.data.type === 'CLOSE_STREAMLIT_SIDEBAR') {
-            const parentDoc = window.parent.document;
-            const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
-            if (sidebar && sidebar.getAttribute('aria-expanded') === 'true') {
-                const collapseBtn = parentDoc.querySelector('[data-testid="stSidebarCollapseButton"] button');
-                if (collapseBtn) collapseBtn.click();
-            }
-        }
+                        for (var i = 0; i < unvisited.length; i++) {{
+                            var dst = getDistance(current.lat, current.lng, unvisited[i].lat, unvisited[i].lng);
+                            if (dst < minDst) {{
+                                minDst = dst;
+                                nearestIdx = i;
+                            }}
+                        }}
 
-        if (event.data.type === 'INSTANT_GPS_SET') {
-            const lat = event.data.lat;
-            const lon = event.data.lon;
-            const parentDoc = window.parent.document;
-            
-            // 1. Cập nhật giao diện HUD bên Sidebar ngay lập tức (Không load lại trang)
-            const hudElem = parentDoc.querySelector('#hud-gps-display');
-            if (hudElem) {
-                hudElem.innerText = lat.toFixed(5) + ', ' + lon.toFixed(5);
-            }
+                        current = unvisited[nearestIdx];
+                        route.push(current);
+                        unvisited.splice(nearestIdx, 1);
+                    }}
 
-            // 2. Cập nhật tham số ngầm cho URL mà không trigger Streamlit reload
-            const currentUrl = new URL(parentDoc.location.href);
-            currentUrl.searchParams.set('lat', lat);
-            currentUrl.searchParams.set('lon', lon);
-            parentDoc.history.replaceState({}, '', currentUrl);
-        }
-    });
+                    // Kết thúc quay trở lại điểm xuất phát (GPS)
+                    route.push(startPt);
+                    return route;
+                }}
 
-    // LA BÀN REALTIME 60FPS
-    function handleOrientation(event) {
-        let heading = null;
-        if (event.webkitCompassHeading) {
-            heading = event.webkitCompassHeading;
-        } else if (event.alpha !== null) {
-            heading = 360 - event.alpha;
-        }
+                var routingControl = null;
 
-        if (heading !== null) {
-            const parentDoc = window.parent.document;
-            const arrowIcons = parentDoc.querySelectorAll('#user-heading-arrow');
-            arrowIcons.forEach(icon => {
-                icon.style.transform = `rotate(${heading}deg)`;
-            });
-        }
-    }
+                function optimizeAndRoute() {{
+                    if (!userLatLng) {{
+                        alert("Đang bắt tín hiệu GPS... Vui lòng bật vị trí trên trình duyệt và thử lại.");
+                        return;
+                    }}
 
-    if (window.DeviceOrientationEvent) {
-        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            DeviceOrientationEvent.requestPermission().then(res => {
-                if (res === 'granted') {
-                    window.addEventListener('deviceorientation', handleOrientation, true);
-                }
-            });
-        } else {
-            window.addEventListener('deviceorientationabsolute', handleOrientation, true);
-            window.addEventListener('deviceorientation', handleOrientation, true);
-        }
-    }
+                    if (targets.length === 0) {{
+                        alert("Vui lòng chọn ít nhất 1 tập điểm ở Sidebar.");
+                        return;
+                    }}
 
-    // CONTINUOUS GPS TRACKER - CẬP NHẬT TỨC THÌ LÊN MÀN HÌNH BẢN ĐỒ
-    if ("geolocation" in navigator) {
-        navigator.geolocation.watchPosition(
-            (position) => {
-                const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
-                
-                // Đẩy vị trí trực tiếp lên bản đồ Leaflet trong Iframe
-                const iframeMap = window.parent.document.querySelector('iframe[src*="folium"]');
-                if (iframeMap && iframeMap.contentWindow && typeof iframeMap.contentWindow.updateGpsMarkerDirectly === 'function') {
-                    iframeMap.contentWindow.updateGpsMarkerDirectly(lat, lon);
-                }
+                    var startPoint = {{ name: "Điểm Xuất Phát (GPS)", lat: userLatLng.lat, lng: userLatLng.lng }};
+                    var optimizedRoute = solveTSP(startPoint, targets);
 
-                // Cập nhật text HUD
-                const hudElem = window.parent.document.querySelector('#hud-gps-display');
-                if (hudElem) {
-                    hudElem.innerText = lat.toFixed(5) + ', ' + lon.toFixed(5);
-                }
+                    var waypoints = optimizedRoute.map(function(pt) {{
+                        return L.latLng(pt.lat, pt.lng);
+                    }});
 
-                // Cập nhật ngầm URL State
-                const currentUrl = new URL(window.parent.location.href);
-                currentUrl.searchParams.set('lat', lat);
-                currentUrl.searchParams.set('lon', lon);
-                window.parent.history.replaceState({}, '', currentUrl);
-            },
-            (err) => {},
-            {
-                enableHighAccuracy: true,
-                maximumAge: 1000,
-                timeout: 5000
-            }
-        );
-    }
-</script>
-""", height=0, width=0)
+                    if (routingControl) {{
+                        map.removeControl(routingControl);
+                    }}
+
+                    routingControl = L.Routing.control({{
+                        waypoints: waypoints,
+                        routeWhileDragging: false,
+                        addWaypoints: false,
+                        show: true,
+                        lineOptions: {{
+                            styles: [{{ color: '#10B981', opacity: 0.8, weight: 6 }}]
+                        }}
+                    }}).addTo(map);
+                }}
+
+                // Control Nút điều khiển góc trên bên trái
+                var CustomControls = L.Control.extend({{
+                    options: {{ position: 'topleft' }},
+                    onAdd: function (map) {{
+                        var container = L.DomUtil.create('div', 'leaflet-bar');
+                        container.style.display = 'flex';
+                        container.style.flexDirection = 'column';
+                        container.style.gap = '6px';
+
+                        var btnLocate = L.DomUtil.create('div', 'leaflet-control-btn', container);
+                        btnLocate.innerHTML = '🎯 GPS của tôi';
+                        btnLocate.onclick = function() {{
+                            if (userLatLng) {{
+                                map.setView(userLatLng, 17);
+                            }} else {{
+                                map.locate({{ setView: true, maxZoom: 17, enableHighAccuracy: true }});
+                            }}
+                        }};
+
+                        var btnRoute = L.DomUtil.create('div', 'leaflet-control-btn', container);
+                        btnRoute.innerHTML = '🚀 Tối ưu lộ trình di chuyển';
+                        btnRoute.style.backgroundColor = '#10B981';
+                        btnRoute.style.color = '#FFFFFF';
+                        btnRoute.onclick = function() {{
+                            optimizeAndRoute();
+                        }};
+
+                        return container;
+                    }}
+                }});
+
+                map.addControl(new CustomControls());
+            }});
+        </script>
+    </body>
+    </html>
+    """
+
+    components.html(leaflet_html, height=1000, scrolling=False)
+
+else:
+    st.warning("⚠️ Không tìm thấy tệp dữ liệu Excel `.xlsx` hoặc `.xls` trong thư mục làm việc.")
