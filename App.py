@@ -400,35 +400,56 @@ if df is not None:
             }}
 
             .leaflet-control-btn {{
-                background-color: #ffffff;
-                border: 2px solid rgba(0,0,0,0.15);
-                border-radius: 20px;
+                border-radius: 20px !important;
                 padding: 7px 14px;
                 cursor: pointer;
                 font-size: 13px;
                 font-weight: bold;
-                box-shadow: 0 3px 8px rgba(0,0,0,0.25);
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 gap: 6px;
                 white-space: nowrap;
-                transition: all 0.2s ease;
+                transition: all 0.3s ease;
             }}
             .leaflet-control-btn:hover {{
                 transform: translateY(-2px);
-                box-shadow: 0 5px 12px rgba(0,0,0,0.35);
             }}
 
-            .btn-neon {{
-                background-color: #00FF66 !important;
-                color: #000000 !important;
-                border: 2px solid #00FF66 !important;
-                box-shadow: 0 0 10px #00FF66, 0 2px 8px rgba(0,0,0,0.2) !important;
+            /* 1. NÚT GPS: NỀN XANH DƯƠNG - BO VIỀN NEON XANH DƯƠNG */
+            .btn-blue-neon {{
+                background-color: #0066FF !important;
+                color: #FFFFFF !important;
+                border: 2px solid #3399FF !important;
+                box-shadow: 0 0 10px #0066FF, 0 0 18px rgba(51, 153, 255, 0.8) !important;
             }}
-            .btn-neon:hover {{
-                background-color: #00CC52 !important;
-                box-shadow: 0 0 15px #00FF66, 0 4px 12px rgba(0,0,0,0.3) !important;
+            .btn-blue-neon:hover {{
+                background-color: #0052CC !important;
+                box-shadow: 0 0 15px #0066FF, 0 0 25px rgba(51, 153, 255, 1) !important;
+            }}
+
+            /* 2. NÚT TỐI ƯU LỘ TRÌNH: NỀN CAM - BO VIỀN NEON CAM */
+            .btn-orange-neon {{
+                background-color: #FF6600 !important;
+                color: #FFFFFF !important;
+                border: 2px solid #FF9933 !important;
+                box-shadow: 0 0 10px #FF6600, 0 0 18px rgba(255, 153, 51, 0.8) !important;
+            }}
+            .btn-orange-neon:hover {{
+                background-color: #CC5200 !important;
+                box-shadow: 0 0 15px #FF6600, 0 0 25px rgba(255, 153, 51, 1) !important;
+            }}
+
+            /* 3. NÚT MENU: NỀN XANH LÁ - BO VIỀN NEON XANH LÁ */
+            .btn-green-neon {{
+                background-color: #00CC44 !important;
+                color: #FFFFFF !important;
+                border: 2px solid #33FF66 !important;
+                box-shadow: 0 0 10px #00CC44, 0 0 18px rgba(51, 255, 102, 0.8) !important;
+            }}
+            .btn-green-neon:hover {{
+                background-color: #009933 !important;
+                box-shadow: 0 0 15px #00CC44, 0 0 25px rgba(51, 255, 102, 1) !important;
             }}
 
             .leaflet-routing-container {{
@@ -607,7 +628,7 @@ if df is not None:
                         show: false,
                         createMarker: function() {{ return null; }},
                         lineOptions: {{
-                            styles: [{{ color: '#10B981', opacity: 0.85, weight: 6 }}]
+                            styles: [{{ color: '#FF6600', opacity: 0.85, weight: 6 }}]
                         }}
                     }}).addTo(map);
                 }}
@@ -617,7 +638,7 @@ if df is not None:
                     onAdd: function (map) {{
                         var container = L.DomUtil.create('div', 'custom-btn-container');
 
-                        var btnLocate = L.DomUtil.create('div', 'leaflet-control-btn', container);
+                        var btnLocate = L.DomUtil.create('div', 'leaflet-control-btn btn-blue-neon', container);
                         btnLocate.innerHTML = '🎯 GPS';
                         btnLocate.onclick = function() {{
                             if (userLatLng) {{
@@ -627,15 +648,13 @@ if df is not None:
                             }}
                         }};
 
-                        var btnRoute = L.DomUtil.create('div', 'leaflet-control-btn', container);
+                        var btnRoute = L.DomUtil.create('div', 'leaflet-control-btn btn-orange-neon', container);
                         btnRoute.innerHTML = '🚀 Tối ưu lộ trình';
-                        btnRoute.style.backgroundColor = '#10B981';
-                        btnRoute.style.color = '#FFFFFF';
                         btnRoute.onclick = function() {{
                             optimizeAndRoute(false);
                         }};
 
-                        var btnToggleSidebar = L.DomUtil.create('div', 'leaflet-control-btn btn-neon', container);
+                        var btnToggleSidebar = L.DomUtil.create('div', 'leaflet-control-btn btn-green-neon', container);
                         btnToggleSidebar.innerHTML = '👁️ Menu';
                         btnToggleSidebar.onclick = function() {{
                             var sidebarBtn = window.parent.document.querySelector('[data-testid="stSidebarCollapseButton"] button') ||
