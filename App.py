@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="auto",
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen & Khắc phục triệt để lỗi mất danh sách Multiselect
+# CSS Tùy chỉnh giao diện Fullscreen & ĐẶC TRỊ LỖI MẤT DANH SÁCH DROPDOWN TRÊN MOBILE
 st.markdown(
     """
     <style>
@@ -57,45 +57,56 @@ st.markdown(
         }
 
         /* ========================================================= */
-        /* 2. SỬA LỖI HIỂN THỊ MULTISELECT TRÊN MOBILE (BẮT BUỘC) */
+        /* 2. FIX TẬN GỐC LỖI MẤT DANH SÁCH MULTISELECT TRÊN DI ĐỘNG */
         /* ========================================================= */
-        /* Đảm bảo Sidebar luôn nổi trên bản đồ và có thể cuộn */
-        section[data-testid="stSidebar"] {
-            z-index: 999999 !important;
-            background-color: rgba(255, 255, 255, 0.75) !important;
-            backdrop-filter: blur(14px) !important;
-            -webkit-backdrop-filter: blur(14px) !important;
-            border-right: 1px solid rgba(255, 255, 255, 0.4) !important;
-            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1) !important;
-            overflow-y: auto !important;
-            overflow-x: visible !important;
+        /* Bắt buộc Sidebar và tất cả thẻ cha của nó không bị giới hạn khung nhìn (overflow: visible) */
+        section[data-testid="stSidebar"],
+        section[data-testid="stSidebar"] > div,
+        section[data-testid="stSidebar"] [data-testid="stVerticalBlock"],
+        section[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] {
+            overflow: visible !important;
         }
 
-        /* Cho phép nội dung Sidebar tràn ra ngoài nếu là menu xổ xuống */
+        section[data-testid="stSidebar"] {
+            z-index: 999999 !important;
+            background-color: rgba(255, 255, 255, 0.92) !important;
+            backdrop-filter: blur(14px) !important;
+            -webkit-backdrop-filter: blur(14px) !important;
+            border-right: 1px solid rgba(0, 0, 0, 0.1) !important;
+            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.15) !important;
+        }
+
+        /* Đảm bảo phần nội dung có thể cuộn độc lập khi quá dài */
         section[data-testid="stSidebar"] > div:first-child {
             background: transparent !important;
             padding: 1rem !important;
-            padding-bottom: 8rem !important; /* Khoảng trống cuộn dưới chân */
-            height: auto !important;
-            min-height: 100vh !important;
-            overflow-y: visible !important;
-            overflow-x: visible !important;
+            padding-bottom: 12rem !important;
+            height: 100vh !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
         }
 
-        /* Bắt buộc khung hiển thị danh sách thả xuống (Popover/Dropdown) phải nổi lên trên cùng tuyệt đối */
-        div[data-baseweb="popover"], 
+        /* ÉP Z-INDEX CAO NHẤT BẬC CHO KHUNG MENU CHỌN XỔ XUỐNG (DROPDOWN POPOVER) */
+        div[data-baseweb="popover"],
         div[data-baseweb="menu"],
         div[role="listbox"],
-        div[aria-label="dropdown menu"] {
-            z-index: 2000000 !important;
+        ul[role="listbox"],
+        div[aria-label="dropdown menu"],
+        div[data-testid="stSelectboxVirtualDropdown"] {
+            z-index: 2147483647 !important; /* Max 32-bit Integer Z-index */
             position: fixed !important;
-            max-height: 50vh !important;
+            background-color: #FFFFFF !important;
+            border: 2px solid #0066FF !important;
+            border-radius: 12px !important;
+            box-shadow: 0px 10px 25px rgba(0,0,0,0.3) !important;
+            max-height: 45vh !important;
             overflow-y: auto !important;
         }
 
-        /* Sửa giao diện Multiselect gọn gàng hơn trên màn hình nhỏ */
+        /* Cấu hình lại ô Multiselect để người dùng dễ bấm trên điện thoại */
         div[data-baseweb="select"] {
-            z-index: 100000 !important;
+            z-index: 10000 !important;
+            border-radius: 10px !important;
         }
 
         /* 3. LÀM NỀN LOGO TRONG SUỐT HOÀN TOÀN */
