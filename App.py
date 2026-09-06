@@ -1,19 +1,18 @@
-import json
 import os
+import json
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
 # 1. Cấu hình trang Streamlit
 st.set_page_config(
-    page_title="Tuyến đường - Make by BangNC13",
-    layout="wide",
-    initial_sidebar_state="expanded",
+    page_title="Tối Ưu Lộ Trình Di Chuyển Tập Điểm", 
+    layout="wide", 
+    initial_sidebar_state="expanded"
 )
 
 # CSS Tùy chỉnh giao diện Fullscreen, Sidebar Trong Suốt & Nút bấm Toggle xanh Neon
-st.markdown(
-    """
+st.markdown("""
     <style>
         /* 1. Thiết lập tràn màn hình tuyệt đối */
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
@@ -99,180 +98,112 @@ st.markdown(
             display: block !important;
         }
     </style>
-""",
-    unsafe_allow_html=True,
-)
-
+""", unsafe_allow_html=True)
 
 # 2. Đọc file Excel dữ liệu điểm
-@st.cache_data
-def load_excel_data():
-  possible_files = [
-      "QuanLyTĐ.xlsx",
-      "QuanLyTD.xlsx",
-      "Danh-Sách-Đoạn-Cáp.xlsx",
-      "data.xlsx",
-  ]
+@st.cache_data 
+def load_excel_data(): 
+    possible_files = [ 
+        "QuanLyTĐ.xlsx",
+        "QuanLyTD.xlsx",
+        "Danh-Sách-Đoạn-Cáp.xlsx",  
+        "data.xlsx" 
+    ] 
+    
+    selected_file = None 
+    for f in possible_files: 
+        if os.path.exists(f): 
+            selected_file = f 
+            break 
 
-  selected_file = None
-  for f in possible_files:
-    if os.path.exists(f):
-      selected_file = f
-      break
+    if not selected_file: 
+        files = [f for f in os.listdir(".") if f.endswith(".xlsx") or f.endswith(".xls")] 
+        if files: 
+            selected_file = files[0] 
 
-  if not selected_file:
-    files = [
-        f
-        for f in os.listdir(".")
-        if f.endswith(".xlsx") or f.endswith(".xls")
-    ]
-    if files:
-      selected_file = files[0]
+    if selected_file: 
+        df = pd.read_excel(selected_file) 
+        return df, selected_file 
+    return None, None 
 
-  if selected_file:
-    df = pd.read_excel(selected_file)
-    return df, selected_file
-  return None, None
+df, file_name = load_excel_data() 
 
-
-df, file_name = load_excel_data()
-
-# --- THÊM LOGO VÀO TRÊN CÙNG CỦA SIDEBAR ---
-logo_path = "FPT_Telecom_logo.ICON"
-if os.path.exists(logo_path):
-  st.sidebar.image(logo_path, use_container_width=True)
-
-st.sidebar.markdown(
-    '<div class="sidebar-title">TQG - TOOL</div>', unsafe_allow_html=True
-)
-st.sidebar.markdown(
-    '<div class="sidebar-subtitle">Tối ưu quãng đường thu cước - Make by'
-    ' BangNC13 </div>',
-    unsafe_allow_html=True,
-)
+st.sidebar.markdown('<div class="sidebar-title">Tối Ưu Lộ Trình</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="sidebar-subtitle">Tối ưu quãng đường thu cước - Make by BangNC13 </div>', unsafe_allow_html=True)
 
 # Khởi tạo session state kích hoạt tối ưu từ sidebar
 if "trigger_optimize" not in st.session_state:
-  st.session_state.trigger_optimize = False
+    st.session_state.trigger_optimize = False
 
-if df is not None:
-  df.columns = [str(col).strip() for col in df.columns]
+if df is not None: 
+    df.columns = [str(col).strip() for col in df.columns] 
+    
+    # Tìm tự động các cột Tên điểm, Vĩ độ (Lat), Kinh độ (Lng)
+    name_col = next((c for c in df.columns if any(k in c.lower() for k in ['tên', 'điểm', 'kn', 'station', 'name'])), df.columns[0])
+    lat_col = next((c for c in df.columns if any(k in c.lower() for k in ['lat', 'vĩ độ', 'vi do'])), None) 
+    lon_col = next((c for c in df.columns if any(k in c.lower() for k in ['lng', 'lon', 'kinh độ', 'kinh do'])), None) 
 
-  # Tìm tự động các cột Tên điểm, Vĩ độ (Lat), Kinh độ (Lng)
-  name_col = next(
-      (
-          c
-          for c in df.columns
-          if any(k in c.lower() for k in ["tên", "điểm", "kn", "station", "name"])
-      ),
-      df.columns[0],
-  )
-  lat_col = next(
-      (
-          c
-          for c in df.columns
-          if any(k in c.lower() for k in ["lat", "vĩ độ", "vi do"])
-      ),
-      None,
-  )
-  lon_col = next(
-      (
-          c
-          for c in df.columns
-          if any(k in c.lower() for k in ["lng", "lon", "kinh độ", "kinh do"])
-      ),
-      None,
-  )
+    points_dict = {}
+    if lat_col and lon_col:
+        for _, row in df.iterrows():
+            p_name = str(row[name_col]).strip()
+            try:
+                if pd.notnull(row[lat_col]) and pd.notnull(row[lon_col]):
+                    points_dict[p_name] = {
+                        "lat": float(row[lat_col]),
+                        "lng": float(row[lon_col])
+                    }
+            except Exception:
+                pass
+    else:
+        lat_col1 = next((c for c in df.columns if 'lat' in c.lower() and '1' in c.lower()), None) 
+        lon_col1 = next((c for c in df.columns if ('lng' in c.lower() or 'lon' in c.lower()) and '1' in c.lower()), None)
+        k1_col = next((c for c in df.columns if 'kn1' in c.lower() or 'điểm 1' in c.lower()), name_col)
+        
+        if lat_col1 and lon_col1:
+            for _, row in df.iterrows():
+                p_name = str(row[k1_col]).strip()
+                try:
+                    if pd.notnull(row[lat_col1]) and pd.notnull(row[lon_col1]):
+                        points_dict[p_name] = {
+                            "lat": float(row[lat_col1]),
+                            "lng": float(row[lon_col1])
+                        }
+                except Exception:
+                    pass
 
-  points_dict = {}
-  if lat_col and lon_col:
-    for _, row in df.iterrows():
-      p_name = str(row[name_col]).strip()
-      try:
-        if pd.notnull(row[lat_col]) and pd.notnull(row[lon_col]):
-          points_dict[p_name] = {
-              "lat": float(row[lat_col]),
-              "lng": float(row[lon_col]),
-          }
-      except Exception:
-        pass
-  else:
-    lat_col1 = next(
-        (
-            c
-            for c in df.columns
-            if "lat" in c.lower() and "1" in c.lower()
-        ),
-        None,
-    )
-    lon_col1 = next(
-        (
-            c
-            for c in df.columns
-            if ("lng" in c.lower() or "lon" in c.lower()) and "1" in c.lower()
-        ),
-        None,
-    )
-    k1_col = next(
-        (
-            c
-            for c in df.columns
-            if "kn1" in c.lower() or "điểm 1" in c.lower()
-        ),
-        name_col,
+    all_point_names = sorted(list(points_dict.keys()))
+    
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📍 CHỌN CÁC TẬP ĐIỂM CẦN ĐẾN")
+    
+    selected_points = st.sidebar.multiselect(
+        "Chọn các điểm cần đi qua:",
+        options=all_point_names,
+        default=all_point_names[:5] if len(all_point_names) >= 5 else all_point_names,
+        help="Thứ tự tối ưu sẽ được tự động tính toán dựa theo vị trí GPS xuất phát của bạn."
     )
 
-    if lat_col1 and lon_col1:
-      for _, row in df.iterrows():
-        p_name = str(row[k1_col]).strip()
-        try:
-          if pd.notnull(row[lat_col1]) and pd.notnull(row[lon_col1]):
-            points_dict[p_name] = {
-                "lat": float(row[lat_col1]),
-                "lng": float(row[lon_col1]),
-            }
-        except Exception:
-          pass
+    selected_data = []
+    for p in selected_points:
+        selected_data.append({
+            "name": p,
+            "lat": points_dict[p]["lat"],
+            "lng": points_dict[p]["lng"]
+        })
 
-  all_point_names = sorted(list(points_dict.keys()))
+    st.sidebar.info(f"Đã chọn **{len(selected_data)}** tập điểm.")
 
-  st.sidebar.markdown("---")
-  st.sidebar.subheader("📍 CHỌN CÁC TẬP ĐIỂM CẦN ĐẾN")
+    # 🔘 NÚT TỐI ƯU LỘ TRÌNH TRÊN SIDEBAR
+    if st.sidebar.button("🚀 Tối ưu lộ trình di chuyển", type="primary", use_container_width=True):
+        st.session_state.trigger_optimize = True
 
-  selected_points = st.sidebar.multiselect(
-      "Chọn các điểm cần đi qua:",
-      options=all_point_names,
-      default=(
-          all_point_names[:5] if len(all_point_names) >= 5 else all_point_names
-      ),
-      help=(
-          "Thứ tự tối ưu sẽ được tự động tính toán dựa theo vị trí GPS xuất"
-          " phát của bạn."
-      ),
-  )
+    map_center = [21.0285, 105.8542]
+    if len(selected_data) > 0:
+        map_center = [selected_data[0]["lat"], selected_data[0]["lng"]]
 
-  selected_data = []
-  for p in selected_points:
-    selected_data.append({
-        "name": p,
-        "lat": points_dict[p]["lat"],
-        "lng": points_dict[p]["lng"],
-    })
-
-  st.sidebar.info(f"Đã chọn **{len(selected_data)}** tập điểm.")
-
-  # 🔘 NÚT TỐI ƯU LỘ TRÌNH TRÊN SIDEBAR
-  if st.sidebar.button(
-      "🚀 Tối ưu lộ trình", type="primary", use_container_width=True
-  ):
-    st.session_state.trigger_optimize = True
-
-  map_center = [21.0285, 105.8542]
-  if len(selected_data) > 0:
-    map_center = [selected_data[0]["lat"], selected_data[0]["lng"]]
-
-  # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình
-  leaflet_html = f"""
+    # Giao diện Leaflet JS + GPS Realtime + Đánh số thứ tự + Tối ưu lộ trình
+    leaflet_html = f"""
     <!DOCTYPE html>
     <html>
     <head>
@@ -620,12 +551,9 @@ if df is not None:
     </html>
     """
 
-  components.html(leaflet_html, height=1000, scrolling=False)
+    components.html(leaflet_html, height=1000, scrolling=False)
 
-  st.session_state.trigger_optimize = False
+    st.session_state.trigger_optimize = False
 
 else:
-  st.warning(
-      "⚠️ Không tìm thấy tệp dữ liệu Excel `.xlsx` hoặc `.xls` trong thư mục làm"
-      " việc."
-  )
+    st.warning("⚠️ Không tìm thấy tệp dữ liệu Excel `.xlsx` hoặc `.xls` trong thư mục làm việc.")
